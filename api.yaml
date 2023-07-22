@@ -13,16 +13,16 @@ servers:
   - description: Production
     url: https://ecocor.org/api
 tags:
-- name: meta
-  description: Information about this service.
-- name: corpus
-  description: Analyze a corpus.
-- name: text
-  description: Analyze a text.
-- name: entities
-  description: Analyze occurrences of animals and plants in corpora and texts.
-- name: admin
-  description: Manage corpora.
+  - name: meta
+    description: Information about this service.
+  - name: corpus
+    description: Analyze a corpus.
+  - name: text
+    description: Analyze a text.
+  - name: entities
+    description: Analyze occurrences of animals and plants in corpora and texts.
+  - name: admin
+    description: Manage corpora.
 paths:
   /info:
     get:
