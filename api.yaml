@@ -70,14 +70,30 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Corpus'
-
               example:
                 [
                   {
                     "name": "en",
                     "title": "English EcoCor",
                     "repository": "https://github.com/dracor-org/eco_en",
-                    "uri": "https://ecocor.org/api/corpora/en",
+                    "description": "See the [README on GitHub](https://github.com/dracor-org/eco_en).",
+                    "licence": "CC0",
+                    "licenceUrl": "https://creativecommons.org/share-your-work/public-domain/cc0/",
+                    "uri": "http://ecocor.org/api/corpora/en",
+                    "entitiesUrl": "http://ecocor.org/api/corpora/en/entities",
+                    "textsUrl": "http://ecocor.org/api/corpora/en/texts",
+                    "metrics": {
+                      "numOfTexts": 23,
+                      "numOfAuthors": 21,
+                      "numOfParagraphs": 46457,
+                      "numOfWords": 2346818.0,
+                      "numOfEntities": 261,
+                      "numOfEntityTypes": 3,
+                      "numOfAnimals": 245,
+                      "numOfPlants": 16,
+                      "biodiversityIndex": 0
+                    },
+                    "updated": "2023-06-02T13:52:54.934Z"
                   }
                 ]
     post:
@@ -165,6 +181,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Corpus'
+              example:
+                {
+                  "name": "en",
+                  "title": "English EcoCor",
+                  "repository": "https://github.com/dracor-org/eco_en",
+                  "description": "See the [README on GitHub](https://github.com/dracor-org/eco_en).",
+                  "licence": "CC0",
+                  "licenceUrl": "https://creativecommons.org/share-your-work/public-domain/cc0/",
+                  "uri": "http://ecocor.org/api/corpora/en",
+                  "entitiesUrl": "http://ecocor.org/api/corpora/en/entities",
+                  "textsUrl": "http://ecocor.org/api/corpora/en/texts",
+                  "metrics": {
+                    "numOfTexts": 23,
+                    "numOfAuthors": 21,
+                    "numOfParagraphs": 46457,
+                    "numOfWords": 2346818.0,
+                    "numOfEntities": 261,
+                    "numOfEntityTypes": 3,
+                    "numOfAnimals": 245,
+                    "numOfPlants": 16,
+                    "biodiversityIndex": 0
+                  },
+                  "updated": "2023-06-02T13:52:54.934Z"
+                }
         '404':
           description: Corpus not found
     post:
@@ -379,24 +419,36 @@ components:
     CorpusMetrics:
       type: object
       properties:
+        numOfTexts:
+          type: integer
         numOfParagraphs:
+          type: integer
+        numOfWords:
+          type: integer
+        numOfAuthors:
+          type: integer
+        numOfEntities:
           type: integer
         numOfEntityTypes:
           type: integer
         biodiversityIndex:
           type: number
-        numOfTexts:
-          type: integer
-        updated:
-          type: string
-        numOfEntities:
-          type: integer
     Corpus:
       type: object
       properties:
+        name:
+          type: string
+        title:
+          type: string
+        acronym:
+          type: string
+        description:
+          type: string
         repository:
           type: string
           format: url
+        licence:
+          type: string
         licenceUrl:
           type: string
           format: url
@@ -405,17 +457,18 @@ components:
         textsUrl:
           type: string
           format: url
-        description:
-          type: string
-        licence:
-          type: string
-        title:
-          type: string
         entitiesUrl:
           type: string
           format: url
-        corpusname:
+        updated:
           type: string
+      required:
+        - name
+        - title
+        - repository
+        - textsUrl
+        - entitiesUrl
+        - updated
     ExternalReferenceResourceId:
       type: object
       properties:

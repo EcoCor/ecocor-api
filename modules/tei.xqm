@@ -344,6 +344,19 @@ declare function ectei:get-corpus-text-info(
   return ectei:get-text-info($tei)
 };
 
+(:~
+ : Extract corpus update timestamp from metrics.
+ :
+ : @param $corpusname
+ :)
+declare function ectei:get-corpus-update-time(
+  $corpusname as xs:string
+) as xs:dateTime* {
+  let $metrics-uri := concat($config:metrics-root, "/", $corpusname)
+  let $metrics := collection($metrics-uri)
+  return max($metrics//metrics/xs:dateTime(@updated))
+};
+
 declare function local:to-markdown($input as element()) as item()* {
   for $child in $input/node()
   return
@@ -389,13 +402,16 @@ declare function ectei:get-corpus-info(
       map:entry("uri", $uri),
       map:entry("name", $name),
       map:entry("title", $title),
+      map:entry("textsUrl", $uri || "/texts"),
+      map:entry("entitiesUrl", $uri || "/entities"),
       if ($acronym) then map:entry("acronym", $acronym) else (),
       if ($repo) then map:entry("repository", $repo) else (),
       if ($description) then map:entry("description", $description) else (),
       if ($licence)
         then map:entry("licence", normalize-space($licence)) else (),
       if ($licence/@target)
-        then map:entry("licenceUrl", $licence/@target/string()) else ()
+        then map:entry("licenceUrl", $licence/@target/string()) else (),
+      map:entry("updated", ectei:get-corpus-update-time($name))
     ))
   ) else ()
 };

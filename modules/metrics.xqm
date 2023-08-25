@@ -69,12 +69,14 @@ declare function metrics:corpus ($corpus as xs:string) {
   let $metrics := collection($metrics-uri)
   let $entities := collection(concat($config:entities-root, "/", $corpus))
   return map {
-    "texts": count($col/tei:TEI),
-    "authors": count(distinct-values($col//tei:titleStmt//tei:author)),
-    "words": sum($metrics//words),
-    "entities": count(distinct-values($entities//entities/entity/wikidata)),
-    "animals": count(distinct-values($entities//entities/entity[category="Animal"]/wikidata)),
-    "plants": count(distinct-values($entities//entities/entity[category="Plant"]/wikidata)),
-    "updated": max($metrics//metrics/xs:dateTime(@updated))
+    "numOfTexts": count($col/tei:TEI),
+    "numOfAuthors": count(distinct-values($col//tei:titleStmt//tei:author)),
+    "numOfParagraphs": count($col//tei:body//tei:p),
+    "numOfWords": sum($metrics//words),
+    "numOfEntities": count(distinct-values($entities//entities/entity/wikidata)),
+    "numOfEntityTypes": count(distinct-values($entities//entities/entity/category)),
+    "numOfAnimals": count(distinct-values($entities//entities/entity[category="Animal"]/wikidata)),
+    "numOfPlants": count(distinct-values($entities//entities/entity[category="Plant"]/wikidata)),
+    "biodiversityIndex": 0
   }
 };
