@@ -56,15 +56,6 @@ paths:
       description: Get a list of available corpora. Optionally include corpus metrics.
       operationId: get-corpora
       tags: [corpus]
-      parameters:
-        - name: include
-          in: query
-          description: Include metrics for each corpus
-          required: false
-          schema:
-            type: string
-            enum:
-            - metrics
       responses:
         '200':
           description: Returns list of available corpora
