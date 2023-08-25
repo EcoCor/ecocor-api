@@ -9,9 +9,11 @@ info:
   license:
     name: "Apache 2.0"
     url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+
 servers:
   - description: Production
     url: https://ecocor.org/api
+
 tags:
   - name: meta
     description: Information about this service.
@@ -23,6 +25,7 @@ tags:
     description: Analyze occurrences of animals and plants in corpora and texts.
   - name: admin
     description: Manage corpora.
+
 paths:
   /info:
     get:
@@ -46,6 +49,7 @@ paths:
                   "status": "beta",
                   "version": "1.0.0"
                 }
+
   /corpora:
     get:
       summary: List available corpora
@@ -298,13 +302,14 @@ paths:
           description: Text has been removed
         '404':
           description: No such text under this URI
+
   /entities/{wikidataId}:
     get:
       summary: Get single entity
       description: Get a single entity by its identifier on Wikidata.
       operationId: get-entity
       tags:
-      - entities
+        - entities
       parameters:
         - $ref: "#/components/parameters/entityWikidataId"
       responses:
@@ -314,16 +319,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Entity'
+
   /corpora/{corpusname}/entities:
     get:
       summary: Get entities of a single corpus
       description: Optionally filter by entity type.
       operationId: get-corpus-entities
       tags:
-      - entities
+        - entities
       parameters:
-      - $ref: "#/components/parameters/corpusname"
-      - $ref: "#/components/parameters/entityType"
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/entityType"
       responses:
         '200':
           description: entity
@@ -333,17 +339,18 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Entity'
+
   /corpora/{corpusname}/texts/{textname}/entities:
     get:
       summary: Get entities of a single text
       description: Optionally filter by entity type.
       operationId: get-text-entities
       tags:
-      - entities
+        - entities
       parameters:
-      - $ref: "#/components/parameters/corpusname"
-      - $ref: "#/components/parameters/textname"
-      - $ref: "#/components/parameters/entityType"
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/entityType"
       responses:
         '200':
           description: entity
@@ -353,6 +360,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Entity'
+
 components:
   parameters:
     corpusname:
