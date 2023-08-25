@@ -148,11 +148,23 @@ declare function entities:corpus($corpusname as xs:string) {
   let $col := collection($config:entities-root || '/' || $corpusname)
   let $ids := distinct-values($col//entities/entity/wikidata)
   return array {
-    for $id in $ids return
-    map {
-      "id": $id,
-      "name": $col//entities/entity[wikidata=$id][1]/name[1]/text(),
-      "count": sum($col//entities/entity[wikidata=$id]/segments/segment/count)
-    }
+    for $id in $ids
+    let $entities := $col//entities/entity[wikidata=$id]
+    return
+      map {
+        "id": $id,
+        "name": $entities[1]/name[1]/text(),
+        "metrics": map {
+          "overallFrequency": sum($entities/segments/segment/count),
+          "occurrences": array {
+            for $seg in $entities/segments/segment
+            let $f := $seg/count/text()
+            return map {
+              "id": $seg/id/text(),
+              "frequency": if (number($f)) then xs:integer($f) else ()
+            }
+          }
+        }
+      }
   }
 };

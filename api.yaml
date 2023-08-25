@@ -581,8 +581,16 @@ components:
           type: integer
         id:
           type: string
+        # FIXME: Including the text paragraphs will not perform on the corpus
+        # level which is why the property is optional for now. We should
+        # consider removing it and finding an alternative why to access the
+        # text. How about providing a link to the TEI with the paragraph ID as
+        # fragment identifier.
         text:
           type: string
+      required:
+        - frequency
+        - id
     EntityMetrics:
       type: object
       properties:
@@ -594,6 +602,9 @@ components:
             $ref: '#/components/schemas/Occurrence'
         overallFrequency:
           type: integer
+      required:
+        - occurrences
+        - overallFrequency
     Entity:
       type: object
       properties:
