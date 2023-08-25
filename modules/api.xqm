@@ -586,6 +586,30 @@ function api:play-delete($corpusname, $textname, $data, $auth) {
 };
 
 (:~
+ : Get TEI document for a single text
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result XML document
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/tei")
+  %rest:produces("application/xml")
+  %output:media-type("application/xml")
+  %output:method("xml")
+function api:text-tei($corpusname, $textname) {
+  let $doc := ecutil:get-doc($corpusname, $textname)
+  return
+    if (count($doc)) then
+      $doc/tei:TEI
+    else
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+};
+
+(:~
  : Get segments for a single text
  :
  : This provides a JSON object that can serve as payload for the extractor

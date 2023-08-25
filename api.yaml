@@ -272,8 +272,8 @@ paths:
 
   /corpora/{corpusname}/texts/{textname}:
     get:
-      summary: Get a single text
-      description: Get a single text as TEI-XML or metadata about a text in JSON format.
+      summary: Get a single text information
+      description: Get metadata about an individual text in JSON format.
       operationId: get-text
       tags: [text]
       parameters:
@@ -302,6 +302,23 @@ paths:
           description: Text has been removed
         '404':
           description: No such text under this URI
+
+  /corpora/{corpusname}/texts/{textname}/tei:
+    get:
+      summary: Get a single text
+      description: Get a single text as TEI XML.
+      operationId: get-text-tei
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+      tags: [text]
+      responses:
+        '200':
+          description: Returns an TEI XML document
+          content:
+            application/tei+xml:
+              schema:
+                type: string
 
   /entities/{wikidataId}:
     get:
