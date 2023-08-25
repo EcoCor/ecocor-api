@@ -386,7 +386,7 @@ components:
       required: true
       description: >
         Short name of the corpus as provided in the `name` property of the result
-        objects from the [/corpora](#/public/list-corpora) endpoint
+        objects from the [/corpora](#/corpus/get-corpora) endpoint
       schema:
         type: string
       examples:
@@ -403,7 +403,7 @@ components:
       description: >
         Name parameter (or "slug") of the text as provided in the `name`
         property of the result objects of the
-        [/corpora/{corpusname}](#/public/list-corpus-content) endpoint.
+        [/corpora/{corpusname}/texts](#/corpus/get-corpus-texts) endpoint.
       schema:
         type: string
       examples:
