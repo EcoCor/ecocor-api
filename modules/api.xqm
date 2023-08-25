@@ -448,10 +448,11 @@ function api:corpus-texts($corpusname) {
 declare
   %rest:GET
   %rest:path("/ecocor/corpora/{$corpusname}/entities")
+  %rest:query-param("type", "{$type}")
   %rest:produces("application/json")
   %output:media-type("application/json")
   %output:method("json")
-function api:corpus-entities($corpusname) {
+function api:corpus-entities($corpusname, $type) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
   let $collection := concat($config:data-root, "/", $corpusname)
   return
@@ -460,7 +461,7 @@ function api:corpus-entities($corpusname) {
         <http:response status="404"/>
       </rest:response>
     else
-      entities:corpus($corpusname)
+      entities:corpus($corpusname, $type)
 };
 
 (:~

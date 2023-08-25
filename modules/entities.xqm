@@ -143,10 +143,15 @@ declare function entities:update() as xs:string* {
 (:~
  : List entities occurring in a corpus
 :)
-declare function entities:corpus($corpusname as xs:string) {
+declare function entities:corpus(
+  $corpusname as xs:string,
+  $type as xs:string*
+) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
   let $col := collection($config:entities-root || '/' || $corpusname)
-  let $ids := distinct-values($col//entities/entity/wikidata)
+  let $ids := if ($type) then
+    distinct-values($col//entities/entity[category=$type]/wikidata)
+    else distinct-values($col//entities/entity/wikidata)
   return array {
     for $id in $ids
     let $entities := $col//entities/entity[wikidata=$id]
