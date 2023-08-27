@@ -566,7 +566,7 @@ declare
   %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}")
   %rest:header-param("Authorization", "{$auth}")
   %output:method("json")
-function api:play-delete($corpusname, $textname, $data, $auth) {
+function api:text-delete($corpusname, $textname, $data, $auth) {
   if (not($auth)) then
     <rest:response>
       <http:response status="401"/>
