@@ -173,3 +173,38 @@ declare function entities:corpus(
       }
   }
 };
+
+(:~
+ : List entities occurring in a text
+:)
+declare function entities:text(
+  $corpusname as xs:string,
+  $textname as xs:string,
+  $type as xs:string*
+) {
+  let $doc := ecutil:get-doc($corpusname, $textname, $config:entities-root)
+  (: return map {"foo": "bar"} :)
+  let $ids := if ($type) then
+    distinct-values($doc//entity[category=$type]/wikidata)
+    else distinct-values($doc//entity/wikidata)
+  return array {
+    for $id in $ids
+    let $entities := $doc//entity[wikidata=$id]
+    return
+      map {
+        "id": $id,
+        "name": $entities[1]/name[1]/text(),
+        "metrics": map {
+          "overallFrequency": sum($entities/segments/segment/count),
+          "occurrences": array {
+            for $seg in $entities/segments/segment
+            let $f := $seg/count/text()
+            return map {
+              "id": $seg/id/text(),
+              "frequency": if (number($f)) then xs:integer($f) else ()
+            }
+          }
+        }
+      }
+  }
+};

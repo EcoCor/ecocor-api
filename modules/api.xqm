@@ -587,6 +587,31 @@ function api:text-delete($corpusname, $textname, $data, $auth) {
 };
 
 (:~
+ : Get entities for a single text
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result JSON object with entities data
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/entities")
+  %rest:query-param("type", "{$type}")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-entities($corpusname, $textname, $type) {
+  let $entities := entities:text($corpusname, $textname, $type)
+  return
+    if (count($entities)) then
+      $entities
+    else
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+};
+
+(:~
  : Get TEI document for a single text
  :
  : @param $corpusname Corpus name
