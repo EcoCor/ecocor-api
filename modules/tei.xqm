@@ -7,6 +7,7 @@ module namespace ectei = "http://ecocor.org/ns/exist/tei";
 
 import module namespace config = "http://ecocor.org/ns/exist/config" at "config.xqm";
 import module namespace ecutil = "http://ecocor.org/ns/exist/util" at "util.xqm";
+import module namespace metrics = "http://ecocor.org/ns/exist/metrics" at "metrics.xqm";
 
 declare namespace tei = "http://www.tei-c.org/ns/1.0";
 
@@ -286,6 +287,7 @@ declare function ectei:get-text-info($tei as element(tei:TEI)) as map()? {
           "yearNormalized": $year-printed
         })
       else (),
+      map:entry("metrics", metrics:text($paths?corpusname, $paths?textname)),
       map:entry(
         "corpusUrl", $config:api-base || "/corpora/" || $paths?corpusname
       ),
