@@ -495,18 +495,41 @@ components:
     TextMetrics:
       type: object
       properties:
+        numOfChapters:
+          type: integer
         numOfParagraphs:
+          type: integer
+        numOfWords:
+          type: integer
+        numOfEntities:
           type: integer
         numOfEntityTypes:
           type: integer
         biodiversityIndex:
           type: number
-        numOfChapters:
-          type: integer
-        numOfWordTokens:
-          type: integer
-        numOfEntities:
-          type: integer
+    Author:
+      type: object
+      properties:
+        name:
+          type: string
+        ref:
+          type: string
+          format: url
+          description: Wikidata URI
+        gender:
+          type: string
+      required:
+        - name
+    DigitalSource:
+      type: object
+      properties:
+        url:
+          type: string
+          format: url
+        name:
+          type: string
+      required:
+        - url
     PrintSource:
       type: object
       properties:
@@ -518,27 +541,6 @@ components:
           type: integer
         title:
           type: string
-    Author:
-      type: object
-      properties:
-        refs:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExternalReferenceResourceId'
-        name:
-          type: string
-        gender:
-          type: string
-    DigitalSource:
-      type: object
-      properties:
-        url:
-          type: string
-          format: url
-          nullable: true
-        name:
-          type: string
-          nullable: true
     Dates:
       type: object
       properties:
@@ -554,34 +556,49 @@ components:
     Text:
       type: object
       properties:
-        refs:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExternalReferenceResourceId'
-        metrics:
-          $ref: '#/components/schemas/TextMetrics'
-        textname:
-          type: string
-        printedSource:
-          $ref: '#/components/schemas/PrintSource'
         id:
+          type: string
+        name:
+          type: string
+        corpus:
+          type: string
+        title:
           type: string
         authors:
           type: array
           items:
             $ref: '#/components/schemas/Author'
+        ref:
+          type: string
+          format: url
+          description: Wikidata URI for text
+        # FIXME do we need a refs array?
+        # refs:
+        #   type: array
+        #   items:
+        #     $ref: '#/components/schemas/ExternalReferenceResourceId'
+        digitalSource:
+          $ref: '#/components/schemas/DigitalSource'
+        printedSource:
+          $ref: '#/components/schemas/PrintSource'
+        dates:
+          $ref: '#/components/schemas/Dates'
+        metrics:
+          $ref: '#/components/schemas/TextMetrics'
         corpusUrl:
           type: string
           format: url
-        title:
-          type: string
-        digitalSource:
-          $ref: '#/components/schemas/DigitalSource'
         entitiesUrl:
           type: string
           format: url
-        dates:
-          $ref: '#/components/schemas/Dates'
+      required:
+        - id
+        - name
+        - title
+        - corpus
+        - matrics
+        - corpusUrl
+        - entitiesUrl
     Occurrence:
       type: object
       properties:
