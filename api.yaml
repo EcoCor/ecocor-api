@@ -9,9 +9,11 @@ info:
   license:
     name: "Apache 2.0"
     url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+
 servers:
   - description: Production
     url: https://ecocor.org/api
+
 tags:
   - name: meta
     description: Information about this service.
@@ -23,6 +25,7 @@ tags:
     description: Analyze occurrences of animals and plants in corpora and texts.
   - name: admin
     description: Manage corpora.
+
 paths:
   /info:
     get:
@@ -46,21 +49,13 @@ paths:
                   "status": "beta",
                   "version": "1.0.0"
                 }
+
   /corpora:
     get:
       summary: List available corpora
       description: Get a list of available corpora. Optionally include corpus metrics.
       operationId: get-corpora
       tags: [corpus]
-      parameters:
-        - name: include
-          in: query
-          description: Include metrics for each corpus
-          required: false
-          schema:
-            type: string
-            enum:
-            - metrics
       responses:
         '200':
           description: Returns list of available corpora
@@ -70,14 +65,30 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Corpus'
-
               example:
                 [
                   {
                     "name": "en",
                     "title": "English EcoCor",
                     "repository": "https://github.com/dracor-org/eco_en",
-                    "uri": "https://ecocor.org/api/corpora/en",
+                    "description": "See the [README on GitHub](https://github.com/dracor-org/eco_en).",
+                    "licence": "CC0",
+                    "licenceUrl": "https://creativecommons.org/share-your-work/public-domain/cc0/",
+                    "uri": "http://ecocor.org/api/corpora/en",
+                    "entitiesUrl": "http://ecocor.org/api/corpora/en/entities",
+                    "textsUrl": "http://ecocor.org/api/corpora/en/texts",
+                    "metrics": {
+                      "numOfTexts": 23,
+                      "numOfAuthors": 21,
+                      "numOfParagraphs": 46457,
+                      "numOfWords": 2346818.0,
+                      "numOfEntities": 261,
+                      "numOfEntityTypes": 3,
+                      "numOfAnimals": 245,
+                      "numOfPlants": 16,
+                      "biodiversityIndex": 0
+                    },
+                    "updated": "2023-06-02T13:52:54.934Z"
                   }
                 ]
     post:
@@ -165,6 +176,30 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Corpus'
+              example:
+                {
+                  "name": "en",
+                  "title": "English EcoCor",
+                  "repository": "https://github.com/dracor-org/eco_en",
+                  "description": "See the [README on GitHub](https://github.com/dracor-org/eco_en).",
+                  "licence": "CC0",
+                  "licenceUrl": "https://creativecommons.org/share-your-work/public-domain/cc0/",
+                  "uri": "http://ecocor.org/api/corpora/en",
+                  "entitiesUrl": "http://ecocor.org/api/corpora/en/entities",
+                  "textsUrl": "http://ecocor.org/api/corpora/en/texts",
+                  "metrics": {
+                    "numOfTexts": 23,
+                    "numOfAuthors": 21,
+                    "numOfParagraphs": 46457,
+                    "numOfWords": 2346818.0,
+                    "numOfEntities": 261,
+                    "numOfEntityTypes": 3,
+                    "numOfAnimals": 245,
+                    "numOfPlants": 16,
+                    "biodiversityIndex": 0
+                  },
+                  "updated": "2023-06-02T13:52:54.934Z"
+                }
         '404':
           description: Corpus not found
     post:
@@ -228,8 +263,8 @@ paths:
 
   /corpora/{corpusname}/texts/{textname}:
     get:
-      summary: Get a single text
-      description: Get a single text as TEI-XML or metadata about a text in JSON format.
+      summary: Get a single text information
+      description: Get metadata about an individual text in JSON format.
       operationId: get-text
       tags: [text]
       parameters:
@@ -258,13 +293,31 @@ paths:
           description: Text has been removed
         '404':
           description: No such text under this URI
+
+  /corpora/{corpusname}/texts/{textname}/tei:
+    get:
+      summary: Get a single text
+      description: Get a single text as TEI XML.
+      operationId: get-text-tei
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+      tags: [text]
+      responses:
+        '200':
+          description: Returns an TEI XML document
+          content:
+            application/tei+xml:
+              schema:
+                type: string
+
   /entities/{wikidataId}:
     get:
       summary: Get single entity
       description: Get a single entity by its identifier on Wikidata.
       operationId: get-entity
       tags:
-      - entities
+        - entities
       parameters:
         - $ref: "#/components/parameters/entityWikidataId"
       responses:
@@ -274,16 +327,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Entity'
+
   /corpora/{corpusname}/entities:
     get:
       summary: Get entities of a single corpus
       description: Optionally filter by entity type.
       operationId: get-corpus-entities
       tags:
-      - entities
+        - entities
       parameters:
-      - $ref: "#/components/parameters/corpusname"
-      - $ref: "#/components/parameters/entityType"
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/entityType"
       responses:
         '200':
           description: entity
@@ -293,17 +347,18 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Entity'
+
   /corpora/{corpusname}/texts/{textname}/entities:
     get:
       summary: Get entities of a single text
       description: Optionally filter by entity type.
       operationId: get-text-entities
       tags:
-      - entities
+        - entities
       parameters:
-      - $ref: "#/components/parameters/corpusname"
-      - $ref: "#/components/parameters/textname"
-      - $ref: "#/components/parameters/entityType"
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/entityType"
       responses:
         '200':
           description: entity
@@ -313,6 +368,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Entity'
+
 components:
   parameters:
     corpusname:
@@ -321,7 +377,7 @@ components:
       required: true
       description: >
         Short name of the corpus as provided in the `name` property of the result
-        objects from the [/corpora](#/public/list-corpora) endpoint
+        objects from the [/corpora](#/corpus/get-corpora) endpoint
       schema:
         type: string
       examples:
@@ -338,7 +394,7 @@ components:
       description: >
         Name parameter (or "slug") of the text as provided in the `name`
         property of the result objects of the
-        [/corpora/{corpusname}](#/public/list-corpus-content) endpoint.
+        [/corpora/{corpusname}/texts](#/corpus/get-corpus-texts) endpoint.
       schema:
         type: string
       examples:
@@ -353,10 +409,10 @@ components:
       schema:
         type: string
       examples:
-        animal:
-          value: animal
-        plant:
-          value: plant
+        Animal:
+          value: Animal
+        Plant:
+          value: Plant
     entityWikidataId:
       name: wikidataId
       description: Wikidata identifier of an entity (Q Number).
@@ -379,24 +435,36 @@ components:
     CorpusMetrics:
       type: object
       properties:
+        numOfTexts:
+          type: integer
         numOfParagraphs:
+          type: integer
+        numOfWords:
+          type: integer
+        numOfAuthors:
+          type: integer
+        numOfEntities:
           type: integer
         numOfEntityTypes:
           type: integer
         biodiversityIndex:
           type: number
-        numOfTexts:
-          type: integer
-        updated:
-          type: string
-        numOfEntities:
-          type: integer
     Corpus:
       type: object
       properties:
+        name:
+          type: string
+        title:
+          type: string
+        acronym:
+          type: string
+        description:
+          type: string
         repository:
           type: string
           format: url
+        licence:
+          type: string
         licenceUrl:
           type: string
           format: url
@@ -405,17 +473,18 @@ components:
         textsUrl:
           type: string
           format: url
-        description:
-          type: string
-        licence:
-          type: string
-        title:
-          type: string
         entitiesUrl:
           type: string
           format: url
-        corpusname:
+        updated:
           type: string
+      required:
+        - name
+        - title
+        - repository
+        - textsUrl
+        - entitiesUrl
+        - updated
     ExternalReferenceResourceId:
       type: object
       properties:
@@ -426,18 +495,41 @@ components:
     TextMetrics:
       type: object
       properties:
+        numOfChapters:
+          type: integer
         numOfParagraphs:
+          type: integer
+        numOfWords:
+          type: integer
+        numOfEntities:
           type: integer
         numOfEntityTypes:
           type: integer
         biodiversityIndex:
           type: number
-        numOfChapters:
-          type: integer
-        numOfWordTokens:
-          type: integer
-        numOfEntities:
-          type: integer
+    Author:
+      type: object
+      properties:
+        name:
+          type: string
+        ref:
+          type: string
+          format: url
+          description: Wikidata URI
+        gender:
+          type: string
+      required:
+        - name
+    DigitalSource:
+      type: object
+      properties:
+        url:
+          type: string
+          format: url
+        name:
+          type: string
+      required:
+        - url
     PrintSource:
       type: object
       properties:
@@ -449,27 +541,6 @@ components:
           type: integer
         title:
           type: string
-    Author:
-      type: object
-      properties:
-        refs:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExternalReferenceResourceId'
-        name:
-          type: string
-        gender:
-          type: string
-    DigitalSource:
-      type: object
-      properties:
-        url:
-          type: string
-          format: url
-          nullable: true
-        name:
-          type: string
-          nullable: true
     Dates:
       type: object
       properties:
@@ -485,34 +556,49 @@ components:
     Text:
       type: object
       properties:
-        refs:
-          type: array
-          items:
-            $ref: '#/components/schemas/ExternalReferenceResourceId'
-        metrics:
-          $ref: '#/components/schemas/TextMetrics'
-        textname:
-          type: string
-        printedSource:
-          $ref: '#/components/schemas/PrintSource'
         id:
+          type: string
+        name:
+          type: string
+        corpus:
+          type: string
+        title:
           type: string
         authors:
           type: array
           items:
             $ref: '#/components/schemas/Author'
+        ref:
+          type: string
+          format: url
+          description: Wikidata URI for text
+        # FIXME do we need a refs array?
+        # refs:
+        #   type: array
+        #   items:
+        #     $ref: '#/components/schemas/ExternalReferenceResourceId'
+        digitalSource:
+          $ref: '#/components/schemas/DigitalSource'
+        printedSource:
+          $ref: '#/components/schemas/PrintSource'
+        dates:
+          $ref: '#/components/schemas/Dates'
+        metrics:
+          $ref: '#/components/schemas/TextMetrics'
         corpusUrl:
           type: string
           format: url
-        title:
-          type: string
-        digitalSource:
-          $ref: '#/components/schemas/DigitalSource'
         entitiesUrl:
           type: string
           format: url
-        dates:
-          $ref: '#/components/schemas/Dates'
+      required:
+        - id
+        - name
+        - title
+        - corpus
+        - matrics
+        - corpusUrl
+        - entitiesUrl
     Occurrence:
       type: object
       properties:
@@ -520,8 +606,16 @@ components:
           type: integer
         id:
           type: string
+        # FIXME: Including the text paragraphs will not perform on the corpus
+        # level which is why the property is optional for now. We should
+        # consider removing it and finding an alternative why to access the
+        # text. How about providing a link to the TEI with the paragraph ID as
+        # fragment identifier.
         text:
           type: string
+      required:
+        - frequency
+        - id
     EntityMetrics:
       type: object
       properties:
@@ -533,6 +627,9 @@ components:
             $ref: '#/components/schemas/Occurrence'
         overallFrequency:
           type: integer
+      required:
+        - occurrences
+        - overallFrequency
     Entity:
       type: object
       properties:

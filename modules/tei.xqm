@@ -7,6 +7,7 @@ module namespace ectei = "http://ecocor.org/ns/exist/tei";
 
 import module namespace config = "http://ecocor.org/ns/exist/config" at "config.xqm";
 import module namespace ecutil = "http://ecocor.org/ns/exist/util" at "util.xqm";
+import module namespace metrics = "http://ecocor.org/ns/exist/metrics" at "metrics.xqm";
 
 declare namespace tei = "http://www.tei-c.org/ns/1.0";
 
@@ -245,32 +246,11 @@ declare function ectei:get-authors($tei as node()) as map()* {
   for $author in $tei//tei:fileDesc/tei:titleStmt/tei:author[
     not(@role="illustrator")
   ]
-  let $name := ectei:get-sort-name($author)
-  let $fullname := ectei:get-full-name($author)
-  let $shortname := ectei:get-short-name($author)
-  let $nameEn := ectei:get-sort-name($author, 'eng')
-  let $fullnameEn := ectei:get-full-name($author, 'eng')
-  let $shortnameEn := ectei:get-short-name($author, 'eng')
-  let $wikidata-id := tokenize($author/@ref, 'https://www.wikidata.org/wiki/')[2]
-  let $refs := array {
-    if ($wikidata-id) then map{ "wikidata": $wikidata-id } else ()
-  }
-  let $aka := array {
-    for $name in $author/tei:persName[position() > 1]
-    return $name => normalize-space()
-  }
-
   return map:merge((
     map {
-      "name": $name,
-      "fullname": $fullname,
-      "shortname": $shortname,
-      "refs": $refs
+      "name": tokenize(normalize-space($author), ' *\(')[1]
     },
-    if ($nameEn) then map {"nameEn": $nameEn} else (),
-    if ($fullnameEn) then map {"fullnameEn": $fullnameEn} else (),
-    if ($shortnameEn) then map {"shortnameEn": $shortnameEn} else (),
-    if (array:size($aka) > 0) then map {"alsoKnownAs": $aka} else ()
+    if ($author/@ref) then map {"ref": $author/@ref/string()} else ()
   ))
 };
 
@@ -284,12 +264,11 @@ declare function ectei:get-text-info($tei as element(tei:TEI)) as map()? {
   if ($tei) then
     let $id := ectei:get-ecocor-id($tei)
     let $titles := ectei:get-titles($tei)
-    let $titlesEn := ectei:get-titles($tei, 'eng')
-    let $source := $tei//tei:sourceDesc/tei:bibl[@type="digitalSource"]
-    let $orig-source := $tei//tei:bibl[@type="originalSource"][1]/normalize-space(.)
     let $authors := ectei:get-authors($tei)
-    let $wikidata-id := ectei:get-text-wikidata-id($tei)
     let $paths := ecutil:filepaths($tei/base-uri())
+    let $ref := $tei//tei:fileDesc/tei:titleStmt/tei:title/@ref
+    let $year-printed := $tei//tei:sourceDesc/tei:bibl[@type="firstEdition"]
+      /tei:date/@when/string()
 
     return map:merge((
       map {
@@ -299,21 +278,23 @@ declare function ectei:get-text-info($tei as element(tei:TEI)) as map()? {
         "title": $titles?main,
         "authors": array { for $author in $authors return $author }
       },
-      if($titlesEn?main) then map:entry("titleEn", $titlesEn?main) else (),
-      if($titles?sub) then map:entry("subtitle", $titles?sub) else (),
-      if($titlesEn?sub) then map:entry("subtitleEn", $titlesEn?sub) else (),
-      if($wikidata-id) then
-        map:entry("wikidataId", $wikidata-id)
-      else (),
-      if($orig-source) then
-        map:entry("originalSource", $orig-source)
-      else (),
-      if($source) then
-        map:entry("source", map {
-          "name": $source/tei:name/string(),
-          "url": $source/tei:idno[@type="URL"][1]/string()
+      if($ref) then map:entry("ref", $ref/string()) else (),
+      (: TODO implement `digitalSource` and `printedSource` properties :)
+      (: TODO implement `yearWritten` and `yearNormalized` :)
+      if($year-printed) then
+        map:entry("dates", map {
+          "yearWritten": $year-printed,
+          "yearNormalized": $year-printed
         })
-      else ()
+      else (),
+      map:entry("metrics", metrics:text($paths?corpusname, $paths?textname)),
+      map:entry(
+        "corpusUrl", $config:api-base || "/corpora/" || $paths?corpusname
+      ),
+      map:entry(
+        "entitiesUrl",
+        $config:api-base || "/corpora/" || $paths?corpusname || "/texts/" || $paths?textname || "/entities"
+      )
     ))
   else ()
 };
@@ -342,6 +323,19 @@ declare function ectei:get-corpus-text-info(
 ) as map()* {
   for $tei in ecutil:get-corpus-docs($corpusname)
   return ectei:get-text-info($tei)
+};
+
+(:~
+ : Extract corpus update timestamp from metrics.
+ :
+ : @param $corpusname
+ :)
+declare function ectei:get-corpus-update-time(
+  $corpusname as xs:string
+) as xs:dateTime* {
+  let $metrics-uri := concat($config:metrics-root, "/", $corpusname)
+  let $metrics := collection($metrics-uri)
+  return max($metrics//metrics/xs:dateTime(@updated))
 };
 
 declare function local:to-markdown($input as element()) as item()* {
@@ -389,13 +383,16 @@ declare function ectei:get-corpus-info(
       map:entry("uri", $uri),
       map:entry("name", $name),
       map:entry("title", $title),
+      map:entry("textsUrl", $uri || "/texts"),
+      map:entry("entitiesUrl", $uri || "/entities"),
       if ($acronym) then map:entry("acronym", $acronym) else (),
       if ($repo) then map:entry("repository", $repo) else (),
       if ($description) then map:entry("description", $description) else (),
       if ($licence)
         then map:entry("licence", normalize-space($licence)) else (),
       if ($licence/@target)
-        then map:entry("licenceUrl", $licence/@target/string()) else ()
+        then map:entry("licenceUrl", $licence/@target/string()) else (),
+      map:entry("updated", ectei:get-corpus-update-time($name))
     ))
   ) else ()
 };

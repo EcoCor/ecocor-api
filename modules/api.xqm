@@ -448,10 +448,11 @@ function api:corpus-texts($corpusname) {
 declare
   %rest:GET
   %rest:path("/ecocor/corpora/{$corpusname}/entities")
+  %rest:query-param("type", "{$type}")
   %rest:produces("application/json")
   %output:media-type("application/json")
   %output:method("json")
-function api:corpus-entities($corpusname) {
+function api:corpus-entities($corpusname, $type) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
   let $collection := concat($config:data-root, "/", $corpusname)
   return
@@ -460,7 +461,7 @@ function api:corpus-entities($corpusname) {
         <http:response status="404"/>
       </rest:response>
     else
-      entities:corpus($corpusname)
+      entities:corpus($corpusname, $type)
 };
 
 (:~
@@ -565,7 +566,7 @@ declare
   %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}")
   %rest:header-param("Authorization", "{$auth}")
   %output:method("json")
-function api:play-delete($corpusname, $textname, $data, $auth) {
+function api:text-delete($corpusname, $textname, $data, $auth) {
   if (not($auth)) then
     <rest:response>
       <http:response status="401"/>
@@ -583,6 +584,55 @@ function api:play-delete($corpusname, $textname, $data, $auth) {
       let $filename := $textname || ".xml"
       let $collection := $config:data-root || "/" || $corpusname
       return (xmldb:remove($collection, $filename))
+};
+
+(:~
+ : Get entities for a single text
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result JSON object with entities data
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/entities")
+  %rest:query-param("type", "{$type}")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-entities($corpusname, $textname, $type) {
+  let $entities := entities:text($corpusname, $textname, $type)
+  return
+    if (count($entities)) then
+      $entities
+    else
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+};
+
+(:~
+ : Get TEI document for a single text
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result XML document
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/tei")
+  %rest:produces("application/xml")
+  %output:media-type("application/xml")
+  %output:method("xml")
+function api:text-tei($corpusname, $textname) {
+  let $doc := ecutil:get-doc($corpusname, $textname)
+  return
+    if (count($doc)) then
+      $doc/tei:TEI
+    else
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
 };
 
 (:~

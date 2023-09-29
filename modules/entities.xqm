@@ -143,16 +143,68 @@ declare function entities:update() as xs:string* {
 (:~
  : List entities occurring in a corpus
 :)
-declare function entities:corpus($corpusname as xs:string) {
+declare function entities:corpus(
+  $corpusname as xs:string,
+  $type as xs:string*
+) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
   let $col := collection($config:entities-root || '/' || $corpusname)
-  let $ids := distinct-values($col//entities/entity/wikidata)
+  let $ids := if ($type) then
+    distinct-values($col//entities/entity[category=$type]/wikidata)
+    else distinct-values($col//entities/entity/wikidata)
   return array {
-    for $id in $ids return
-    map {
-      "id": $id,
-      "name": $col//entities/entity[wikidata=$id][1]/name[1]/text(),
-      "count": sum($col//entities/entity[wikidata=$id]/segments/segment/count)
-    }
+    for $id in $ids
+    let $entities := $col//entities/entity[wikidata=$id]
+    return
+      map {
+        "id": $id,
+        "name": $entities[1]/name[1]/text(),
+        "metrics": map {
+          "overallFrequency": sum($entities/segments/segment/count),
+          "occurrences": array {
+            for $seg in $entities/segments/segment
+            let $f := $seg/count/text()
+            return map {
+              "id": $seg/id/text(),
+              "frequency": if (number($f)) then xs:integer($f) else ()
+            }
+          }
+        }
+      }
+  }
+};
+
+(:~
+ : List entities occurring in a text
+:)
+declare function entities:text(
+  $corpusname as xs:string,
+  $textname as xs:string,
+  $type as xs:string*
+) {
+  let $doc := ecutil:get-doc($corpusname, $textname, $config:entities-root)
+  (: return map {"foo": "bar"} :)
+  let $ids := if ($type) then
+    distinct-values($doc//entity[category=$type]/wikidata)
+    else distinct-values($doc//entity/wikidata)
+  return array {
+    for $id in $ids
+    let $entities := $doc//entity[wikidata=$id]
+    return
+      map {
+        "id": $id,
+        "name": $entities[1]/name[1]/text(),
+        "metrics": map {
+          "overallFrequency": sum($entities/segments/segment/count),
+          "occurrences": array {
+            for $seg in $entities/segments/segment
+            let $f := $seg/count/text()
+            return map {
+              "id": $seg/id/text(),
+              "frequency": if (number($f)) then xs:integer($f) else ()
+            }
+          }
+        }
+      }
   }
 };

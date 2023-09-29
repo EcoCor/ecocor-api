@@ -38,7 +38,23 @@ declare function ecutil:filepaths ($url as xs:string) as map() {
 };
 
 (:~
- : Return document for a text.
+ : Return document for an individual text.
+ :
+ : @param $corpusname
+ : @param $textname
+ : @param $root Path to root directory
+ :)
+declare function ecutil:get-doc(
+  $corpusname as xs:string,
+  $textname as xs:string,
+  $root as xs:string
+) as node()* {
+  doc($root || "/" || $corpusname || "/" || $textname || ".xml")
+};
+
+
+(:~
+ : Return TEI document for an individual text.
  :
  : @param $corpusname
  : @param $textname
@@ -47,10 +63,7 @@ declare function ecutil:get-doc(
   $corpusname as xs:string,
   $textname as xs:string
 ) as node()* {
-  let $doc := doc(
-    $config:data-root || "/" || $corpusname || "/" || $textname || ".xml"
-  )
-  return $doc
+  ecutil:get-doc($corpusname, $textname, $config:data-root)
 };
 
 (:~
