@@ -636,6 +636,30 @@ function api:text-tei($corpusname, $textname) {
 };
 
 (:~
+ : Get plain text version of a single text
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result Plain text document
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/plaintext")
+  %rest:produces("text/plain")
+  %output:media-type("text/plain")
+  %output:method("text")
+function api:text-plain($corpusname, $textname) {
+  let $doc := ecutil:get-doc($corpusname, $textname)
+  return
+    if (count($doc)) then
+      ectei:get-plain-text($corpusname, $textname)
+    else
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+};
+
+(:~
  : Get segments for a single text
  :
  : This provides a JSON object that can serve as payload for the extractor

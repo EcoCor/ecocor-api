@@ -311,6 +311,21 @@ paths:
               schema:
                 type: string
 
+  /corpora/{corpusname}/texts/{textname}/plaintext:
+    get:
+      summary: Get plain text version of a single text
+      description: Outputs the body and of the TEI document without any markup.
+      operationId: get-text-plain
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+      tags: [text]
+      responses:
+        '200':
+          description: Returns a plain text document
+          content:
+            text/plain:
+
   /entities/{wikidataId}:
     get:
       summary: Get single entity

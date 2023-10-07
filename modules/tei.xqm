@@ -314,6 +314,33 @@ declare function ectei:get-text-info(
 };
 
 (:~
+ : Extract plain text from a TEI document.
+ :
+ : @param $corpusname
+ : @param $textname
+ :)
+declare function ectei:get-plain-text($tei as element(tei:TEI)) as xs:string? {
+  string-join(
+    $tei//tei:text//(tei:head|tei:p) ! normalize-space(),
+    '&#xA;&#xA;'
+  )
+};
+
+(:~
+ : Extract plain text from a text identified by corpus and text name.
+ :
+ : @param $corpusname
+ : @param $textname
+ :)
+declare function ectei:get-plain-text(
+  $corpusname as xs:string,
+  $textname as xs:string
+) as xs:string? {
+  let $doc := ecutil:get-doc($corpusname, $textname)
+  return if ($doc) then ectei:get-plain-text($doc//tei:TEI) else ()
+};
+
+(:~
  : Extract meta data for all texts in corpus identified by corpusname.
  :
  : @param $corpusname
