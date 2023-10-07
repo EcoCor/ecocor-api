@@ -305,7 +305,7 @@ paths:
       tags: [text]
       responses:
         '200':
-          description: Returns an TEI XML document
+          description: Returns a TEI XML document
           content:
             application/tei+xml:
               schema:
