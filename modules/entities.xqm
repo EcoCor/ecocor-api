@@ -159,6 +159,7 @@ declare function entities:corpus(
       map {
         "id": $id,
         "name": $entities[1]/name[1]/text(),
+        "type": $entities[1]/category/text(),
         "metrics": map {
           "overallFrequency": sum($entities/segments/segment/count),
           "occurrences": array {
@@ -194,6 +195,7 @@ declare function entities:text(
       map {
         "id": $id,
         "name": $entities[1]/name[1]/text(),
+        "type": $entities[1]/category/text(),
         "metrics": map {
           "overallFrequency": sum($entities/segments/segment/count),
           "occurrences": array {
