@@ -384,6 +384,25 @@ paths:
                 items:
                   $ref: '#/components/schemas/Entity'
 
+  /corpora/{corpusname}/texts/{textname}/entities/csv:
+    get:
+      summary: Get entities of a single text as CSV
+      description: Optionally filter by entity type.
+      operationId: get-text-entities-csv
+      tags:
+        - entities
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/entityType"
+      responses:
+        '200':
+          description: entity
+          content:
+            text/csv:
+              schema:
+                type: string
+
 components:
   parameters:
     corpusname:

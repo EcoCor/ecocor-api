@@ -612,6 +612,31 @@ function api:text-entities($corpusname, $textname, $type) {
 };
 
 (:~
+ : Get entities for a single text as CSV
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result Entities CSV
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/entities/csv")
+  %rest:query-param("type", "{$type}")
+  %rest:produces("text/csv")
+  %output:media-type("text/csv")
+  %output:method("text")
+function api:text-entities-csv($corpusname, $textname, $type) {
+  let $entities := entities:text-csv($corpusname, $textname, $type)
+  return
+    if (count($entities)) then
+      $entities
+    else
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+};
+
+(:~
  : Get TEI document for a single text
  :
  : @param $corpusname Corpus name

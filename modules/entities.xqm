@@ -210,3 +210,27 @@ declare function entities:text(
       }
   }
 };
+
+(:~
+ : List entities occurring in a text as CSV
+ :)
+declare function entities:text-csv(
+  $corpusname as xs:string,
+  $textname as xs:string,
+  $type as xs:string*
+) {
+  let $entities := entities:text($corpusname, $textname, $type)
+  let $header := 'id,name,type,overallFrequency'
+  let $rows :=
+    for $e in $entities?* return concat(
+      $e?id,
+      ',"',
+      $e?name,
+      '",',
+      $e?type,
+      ',',
+      $e?metrics?overallFrequency
+    )
+
+  return string-join(($header, $rows), "&#10;")
+};
