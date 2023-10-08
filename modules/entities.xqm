@@ -184,7 +184,6 @@ declare function entities:text(
   $type as xs:string*
 ) {
   let $doc := ecutil:get-doc($corpusname, $textname, $config:entities-root)
-  (: return map {"foo": "bar"} :)
   let $ids := if ($type) then
     distinct-values($doc//entity[category=$type]/wikidata)
     else distinct-values($doc//entity/wikidata)
