@@ -1,0 +1,6 @@
+build/
+.ant-targets-build.xml
+.existdb.json
+expath-pkg.xml
+*.xar
+local.build.properties
