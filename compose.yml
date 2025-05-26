@@ -1,7 +1,7 @@
 name: ecocor
 services:
   api:
-    image: "ecocor-api"
+    image: "ecocor/api"
     build:
       context: .
       dockerfile: Dockerfile
@@ -14,6 +14,7 @@ services:
     ports:
       - "8090:8080"
   extractor:
+    image: "ecocor/extractor"
     build: https://github.com/dh-network/ecocor-extractor.git#main
     ports:
       - "8040:80"

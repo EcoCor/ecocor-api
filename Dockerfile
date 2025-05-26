@@ -1,10 +1,12 @@
+ARG BASE_IMAGE=eclipse-temurin:17-jre
+
 # START STAGE 1
-FROM openjdk:8-jdk-slim as builder
+FROM ${BASE_IMAGE} AS builder
 
 USER root
 
-ENV ANT_VERSION 1.10.14
-ENV ANT_HOME /etc/ant-${ANT_VERSION}
+ENV ANT_VERSION=1.10.14
+ENV ANT_HOME=/etc/ant-${ANT_VERSION}
 
 WORKDIR /tmp
 
@@ -21,7 +23,7 @@ RUN curl -L -o apache-ant-${ANT_VERSION}-bin.tar.gz http://www.apache.org/dist/a
     && rm -rf ${ANT_HOME}/manual \
     && unset ANT_VERSION
 
-ENV PATH ${PATH}:${ANT_HOME}/bin
+ENV PATH=${PATH}:${ANT_HOME}/bin
 
 WORKDIR /tmp/ecocor-api
 COPY . .
@@ -33,9 +35,9 @@ RUN ant \
 # The following has widely been copied from
 # https://github.com/peterstadler/existdb-docker/blob/28e90e782a383eb135e721fd0b846d5a6960d315/Dockerfile
 
-FROM openjdk:8-jre-slim
+FROM ${BASE_IMAGE}
 
-ARG EXIST_VERSION
+ARG VERSION
 ARG MAX_MEMORY
 ARG EXIST_URL
 ARG SAXON_JAR
@@ -43,18 +45,18 @@ ARG ECOCOR_API_BASE
 ARG EXTRACTOR_SERVER
 ARG GITHUB_WEBHOOK_SECRET
 
-ENV EXIST_VERSION ${EXIST_VERSION:-6.0.1}
-ENV EXIST_URL ${EXIST_URL:-https://github.com/eXist-db/exist/releases/download/eXist-${EXIST_VERSION}/exist-installer-${EXIST_VERSION}.jar}
-ENV EXIST_HOME /opt/exist
-ENV MAX_MEMORY ${MAX_MEMORY:-2048}
-ENV EXIST_ENV ${EXIST_ENV:-development}
-ENV EXIST_CONTEXT_PATH ${EXIST_CONTEXT_PATH:-/exist}
-ENV EXIST_DATA_DIR ${EXIST_DATA_DIR:-/opt/exist/data}
-ENV SAXON_JAR ${SAXON_JAR:-/opt/exist/lib/Saxon-HE-9.9.1-8.jar}
-ENV LOG4J_FORMAT_MSG_NO_LOOKUPS true
-ENV ECOCOR_API_BASE ${ECOCOR_API_BASE:-http://localhost:8080/exist/restxq}
-ENV EXTRACTOR_SERVER ${EXTRACTOR_SERVER:-http://localhost:8040}
-ENV GITHUB_WEBHOOK_SECRET ${GITHUB_WEBHOOK_SECRET:-""}
+ENV VERSION=${VERSION:-6.4.0}
+ENV EXIST_URL=${EXIST_URL:-https://github.com/eXist-db/exist/releases/download/eXist-${VERSION}/exist-installer-${VERSION}.jar}
+ENV EXIST_HOME="/opt/exist"
+ENV MAX_MEMORY=${MAX_MEMORY:-2048}
+ENV EXIST_ENV=${EXIST_ENV:-development}
+ENV EXIST_CONTEXT_PATH=${EXIST_CONTEXT_PATH:-/exist}
+ENV EXIST_DATA_DIR=${EXIST_DATA_DIR:-/opt/exist/data}
+ENV SAXON_JAR=${SAXON_JAR:-/opt/exist/lib/Saxon-HE-9.9.1-8.jar}
+ENV LOG4J_FORMAT_MSG_NO_LOOKUPS=true
+ENV ECOCOR_API_BASE=${ECOCOR_API_BASE:-http://localhost:8080/exist/restxq}
+ENV EXTRACTOR_SERVER=${EXTRACTOR_SERVER:-http://localhost:8040}
+ENV GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-""}
 
 RUN useradd ecocor
 
