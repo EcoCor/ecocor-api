@@ -19,25 +19,24 @@ declare namespace tei = "http://www.tei-c.org/ns/1.0";
  : @param $tei TEI document
 :)
 declare function entities:segment($tei as element(tei:TEI)) as map() {
-  map:merge((
-    map {
-      "language": normalize-space($tei/@xml:lang),
-      "segments": array {
-        (: FIXME: remove limit :)
-        for $p in ectei:get-text-paras($tei)
-        return map {
-          "segment_id": normalize-space($p/@xml:id),
-          "text": normalize-space($p)
-        }
+  map {
+    "language": normalize-space($tei/@xml:lang),
+    "segments": array {
+      (: FIXME: remove limit :)
+      for $p in ectei:get-text-paras($tei)
+      return map {
+        "segment_id": normalize-space($p/@xml:id),
+        "text": normalize-space($p)
       }
     },
-    (: FIXME: extractor should choose reasonable list depending on language :)
-    if ($tei/@xml:lang != "de") then map {
-      "entity_list" : map {
-        "url": "https://raw.githubusercontent.com/dh-network/ecocor-extractor/main/word_list/english/animal_plant-en.json"
-      }
-    } else ()
-  ))
+    (: see https://github.com/EcoCor/ecocor-extractor/issues/10 :)
+    "entity_list" : map {
+      "url": if ($tei/@xml:lang = "de") then
+        "https://raw.githubusercontent.com/dh-network/ecocor-extractor/main/word_list/german/animal_plant-de.json"
+      else
+        "https://raw.githubusercontent.com/dh-network/ecocor-extractor/main/word_list/english/animal_plant-en.json"
+    }
+  }
 };
 
 (:~
