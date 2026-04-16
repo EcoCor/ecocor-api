@@ -355,6 +355,51 @@ paths:
         '404':
           description: Text not found or no annotations subcollection
 
+  /corpora/{corpusname}/texts/{textname}/annotations/{layername}:
+    get:
+      summary: Get a single annotation layer
+      description: >-
+        Returns the annotation layer in the requested format. The default
+        JSON response carries layer metadata, the full taxonomy, and all
+        annotations with their target tokens (id + resolved surface text)
+        and body (key-value pairs from `@ana`, `@corresp`, and
+        `tei:note[@type]`).
+
+
+        Use `format=tei` to get the raw TEI document, or `format=tsv`
+        to get a tab-separated table with dynamically derived columns.
+
+
+        Use `category` to filter annotations by `@ana` value (single,
+        comma-separated, or repeated). The filter is ignored for
+        `format=tei`. `size` and `categoryCounts` reflect the filtered
+        set; `taxonomy` always contains the full taxonomy from the layer.
+      operationId: get-text-annotation-layer
+      tags: [annotations]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/layername"
+        - $ref: "#/components/parameters/format"
+        - $ref: "#/components/parameters/category"
+      responses:
+        '200':
+          description: >-
+            Returns the annotation layer as JSON (default), raw TEI XML
+            (format=tei), or TSV (format=tsv).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnotationLayerFull'
+            application/xml:
+              schema:
+                type: string
+            text/tab-separated-values:
+              schema:
+                type: string
+        '404':
+          description: Text or annotation layer not found
+
   /entities/{wikidataId}:
     get:
       summary: Get single entity
@@ -483,6 +528,54 @@ components:
       required: true
       schema:
         type: string
+    layername:
+      name: layername
+      in: path
+      required: true
+      description: >
+        Annotation layer name as provided in the `name` property of the
+        layers listing. This is the filename without `.xml`.
+      schema:
+        type: string
+      examples:
+        linguistic:
+          value: linguistic
+          summary: POS and lemma annotations
+        dictionarylookup:
+          value: dictionarylookup
+          summary: Entity annotations from dictionary lookup
+        ntee:
+          value: ntee
+          summary: Manual/expert entity annotations
+    format:
+      name: format
+      in: query
+      required: false
+      description: >
+        Output format. Default is "json". Use "tei" for the raw TEI
+        document or "tsv" for tab-separated values. The `category`
+        filter is ignored for `format=tei`.
+      schema:
+        type: string
+        enum: [json, tei, tsv]
+        default: json
+    category:
+      name: category
+      in: query
+      required: false
+      description: >
+        Filter annotations by category (the `@ana` value with leading
+        `#` stripped). Accepts a single value, a comma-separated list,
+        or a repeated query parameter.
+      schema:
+        type: string
+      examples:
+        plant:
+          value: cat-plant
+        animal:
+          value: cat-animal
+        noun:
+          value: stts-NN
   schemas:
     Info:
       type: object
@@ -755,3 +848,75 @@ components:
         - size
         - categoryCounts
         - uri
+    AnnotationLayerFull:
+      allOf:
+        - $ref: '#/components/schemas/AnnotationLayer'
+        - type: object
+          properties:
+            taxonomy:
+              type: object
+              description: >-
+                Category definitions from the layer's `<classDecl>`.
+                Always the full taxonomy, regardless of category filter.
+              properties:
+                id:
+                  type: string
+                categories:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      description:
+                        type: string
+            annotations:
+              type: array
+              items:
+                $ref: '#/components/schemas/Annotation'
+          required:
+            - annotations
+    Annotation:
+      type: object
+      properties:
+        target:
+          type: object
+          description: The annotated token(s)
+          properties:
+            id:
+              description: >-
+                Token xml:id. For multi-token spans this is an array of
+                ids in document order.
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
+            text:
+              type: string
+              description: >-
+                Surface form of the target token(s), resolved from the
+                tokenized base TEI. Multi-token spans are joined with
+                single spaces.
+          required:
+            - id
+            - text
+        body:
+          type: array
+          description: >-
+            Key-value pairs representing the annotation content.
+            Keys come from TEI attributes (`ana`, `corresp`) and
+            `tei:note[@type]` children (e.g. `lemma`).
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              value:
+                type: string
+            required:
+              - key
+              - value
+      required:
+        - target
+        - body
