@@ -121,11 +121,10 @@ declare function entities:to-xml($entities as map()) {
 declare function entities:update($url as xs:string) {
   let $entities := entities:extract-for-url($url)
   let $paths := ecutil:filepaths($url)
-  let $collection := $paths?collections?entities
-  let $resource := $paths?filename
+  let $collection := $paths?collections?text
   return (
-    util:log-system-out('Entities update: ' || $collection || '/' || $resource),
-    xmldb:store($collection, $resource, entities:to-xml($entities))
+    util:log-system-out('Entities update: ' || $paths?files?entities),
+    xmldb:store($collection, 'entities.xml', entities:to-xml($entities))
   )
 };
 
@@ -134,7 +133,7 @@ declare function entities:update($url as xs:string) {
 :)
 declare function entities:update() as xs:string* {
   let $l := util:log-system-out("Updating entities files")
-  for $tei in collection($config:data-root)//tei:TEI
+  for $tei in collection($config:corpora-root)//tei:TEI
   let $url := $tei/base-uri()
   return (util:log-system-out($url), entities:update($url))
 };
@@ -147,7 +146,7 @@ declare function entities:corpus(
   $type as xs:string*
 ) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
-  let $col := collection($config:entities-root || '/' || $corpusname)
+  let $col := collection($config:corpora-root || '/' || $corpusname)
   let $ids := if ($type) then
     distinct-values($col//entities/entity[category=$type]/wikidata)
     else distinct-values($col//entities/entity/wikidata)
@@ -182,7 +181,8 @@ declare function entities:text(
   $textname as xs:string,
   $type as xs:string*
 ) {
-  let $doc := ecutil:get-doc($corpusname, $textname, $config:entities-root)
+  let $paths := ecutil:filepaths($corpusname, $textname)
+  let $doc := doc($paths?files?entities)
   let $ids := if ($type) then
     distinct-values($doc//entity[category=$type]/wikidata)
     else distinct-values($doc//entity/wikidata)

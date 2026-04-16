@@ -44,11 +44,11 @@ declare function metrics:calculate($url as xs:string) {
 declare function metrics:update($url as xs:string) {
   let $metrics := metrics:calculate($url)
   let $paths := ecutil:filepaths($url)
-  let $collection := $paths?collections?metrics
-  let $resource := $paths?filename
+  let $collection := $paths?collections?text
+
   return (
-    util:log-system-out('Metrics update: ' || $collection || '/' || $resource),
-    xmldb:store($collection, $resource, $metrics)
+    util:log-system-out('Metrics update: ' || $paths?files?metrics),
+    xmldb:store($collection, 'metrics.xml', $metrics)
   )
 };
 
@@ -57,26 +57,22 @@ declare function metrics:update($url as xs:string) {
 :)
 declare function metrics:update() as xs:string* {
   let $l := util:log-system-out("Updating metrics files")
-  for $tei in collection($config:data-root)//tei:TEI
+  for $tei in collection($config:corpora-root)//tei:TEI
   let $url := $tei/base-uri()
   return metrics:update($url)
 };
 
 declare function metrics:corpus ($corpus as xs:string) {
-  let $collection-uri := concat($config:data-root, "/", $corpus)
-  let $col := collection($collection-uri)
-  let $metrics-uri := concat($config:metrics-root, "/", $corpus)
-  let $metrics := collection($metrics-uri)
-  let $entities := collection(concat($config:entities-root, "/", $corpus))
+  let $col := collection($config:corpora-root || "/" || $corpus)
   return map {
     "numOfTexts": count($col/tei:TEI),
     "numOfAuthors": count(distinct-values($col//tei:titleStmt//tei:author)),
     "numOfParagraphs": count($col//tei:body//tei:p),
-    "numOfWords": sum($metrics//words),
-    "numOfEntities": count(distinct-values($entities//entities/entity/wikidata)),
-    "numOfEntityTypes": count(distinct-values($entities//entities/entity/category)),
-    "numOfAnimals": count(distinct-values($entities//entities/entity[category="Animal"]/wikidata)),
-    "numOfPlants": count(distinct-values($entities//entities/entity[category="Plant"]/wikidata)),
+    "numOfWords": sum($col//words),
+    "numOfEntities": count(distinct-values($col//entities/entity/wikidata)),
+    "numOfEntityTypes": count(distinct-values($col//entities/entity/category)),
+    "numOfAnimals": count(distinct-values($col//entities/entity[category="Animal"]/wikidata)),
+    "numOfPlants": count(distinct-values($col//entities/entity[category="Plant"]/wikidata)),
     "biodiversityIndex": 0
   }
 };
@@ -86,8 +82,9 @@ declare function metrics:text (
   $textname as xs:string
 ) {
   let $doc := ecutil:get-doc($corpusname, $textname)
-  let $metrics := ecutil:get-doc($corpusname, $textname, $config:metrics-root)
-  let $entities := ecutil:get-doc($corpusname, $textname, $config:entities-root)
+  let $paths := ecutil:filepaths($corpusname, $textname)
+  let $metrics := doc($paths?files?metrics)
+  let $entities := doc($paths?files?entities)
   return map {
     "numOfChapters": count($doc/tei:TEI//tei:text//tei:div[@type = "chapter"]),
     "numOfParagraphs": count($doc/tei:TEI//tei:body//tei:p),

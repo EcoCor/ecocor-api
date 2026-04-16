@@ -30,8 +30,12 @@ declare variable $config:app-root :=
         substring-before($modulePath, "/modules")
 ;
 
-declare variable $config:file := "/db/data/ecocor/config.xml";
-declare variable $config:secrets-file := "/db/data/ecocor/secrets.xml";
+declare variable $config:ecocor-root := "/db/ecocor";
+declare variable $config:corpora-root := $config:ecocor-root || "/corpora";
+declare variable $config:webhook-root := $config:ecocor-root || "/webhook";
+
+declare variable $config:file := $config:ecocor-root || "/config.xml";
+declare variable $config:secrets-file := $config:ecocor-root || "/secrets.xml";
 
 (:
   The base URL under which the REST API is hosted.
@@ -41,14 +45,6 @@ declare variable $config:secrets-file := "/db/data/ecocor/secrets.xml";
 :)
 declare variable $config:api-base :=
   doc($config:file)//api-base/normalize-space();
-
-declare variable $config:data-root := "/db/data/ecocor/tei";
-
-declare variable $config:entities-root := "/db/data/ecocor/entities";
-
-declare variable $config:metrics-root := "/db/data/ecocor/metrics";
-
-declare variable $config:webhook-root := "/db/data/ecocor/webhook";
 
 declare variable $config:webhook-secret :=
   doc($config:secrets-file)//gh-webhook/normalize-space();
