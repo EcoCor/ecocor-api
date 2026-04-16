@@ -25,13 +25,15 @@ declare function local:store(
     let $sha := $param[2]
     let $filename := tokenize($path, "/")[last()]
     let $name := replace($filename, "\.xml$", "")
+    let $variant := tokenize($path, "/")[2]
     let $log := util:log-system-out("LOADING " || $path)
     let $res := if ($name = "corpus") then
       xmldb:store($collection, "corpus.xml", $data)
     else
       let $text-collection := xmldb:create-collection($collection, $name)
       return try {
-        xmldb:store($text-collection, "tei.xml", $data),
+        xmldb:create-collection($text-collection, "annotations"),
+        xmldb:store($text-collection, $variant || ".xml", $data),
         if ($sha) then
           xmldb:store($text-collection, "git.xml", <git><sha>{$sha}</sha></git>)
         else ()
@@ -46,9 +48,10 @@ declare function local:store(
 declare function local:filter(
   $path as xs:anyURI, $type as xs:string, $param as item()*
 ) as xs:boolean {
-  (: filter paths using only XML files in the "tei" subdirectory :)
-  if ($type eq "resource" and (
-    matches($path, "/tei/[-._a-z\d]+\.xml$", "i") or
+  let $_ := util:log-system-out("FILTER " || $path)
+  (: filter paths for XML files in the "tei" and "tokenized" subdirectories :)
+  return if ($type eq "resource" and (
+    matches($path, "/(tei|tokenized)/[-._a-z\d]+\.xml$", "i") or
     contains($path, "corpus.xml")
   )) then
     true()

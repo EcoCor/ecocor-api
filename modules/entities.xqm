@@ -133,7 +133,7 @@ declare function entities:update($url as xs:string) {
 :)
 declare function entities:update() as xs:string* {
   let $l := util:log-system-out("Updating entities files")
-  for $tei in collection($config:corpora-root)//tei:TEI
+  for $tei in collection($config:corpora-root)/tei:TEI[not(@type)]
   let $url := $tei/base-uri()
   return (util:log-system-out($url), entities:update($url))
 };

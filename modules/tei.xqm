@@ -401,7 +401,7 @@ declare function ectei:get-text-info(
   $textname as xs:string
 ) as map()? {
   let $doc := ecutil:get-doc($corpusname, $textname)
-  return if ($doc) then ectei:get-text-info($doc//tei:TEI) else ()
+  return if ($doc) then ectei:get-text-info($doc/tei:TEI) else ()
 };
 
 (:~
@@ -428,7 +428,7 @@ declare function ectei:get-plain-text(
   $textname as xs:string
 ) as xs:string? {
   let $doc := ecutil:get-doc($corpusname, $textname)
-  return if ($doc) then ectei:get-plain-text($doc//tei:TEI) else ()
+  return if ($doc) then ectei:get-plain-text($doc/tei:TEI) else ()
 };
 
 (:~

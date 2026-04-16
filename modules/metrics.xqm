@@ -57,7 +57,7 @@ declare function metrics:update($url as xs:string) {
 :)
 declare function metrics:update() as xs:string* {
   let $l := util:log-system-out("Updating metrics files")
-  for $tei in collection($config:corpora-root)//tei:TEI
+  for $tei in collection($config:corpora-root)/tei:TEI[not(@type)]
   let $url := $tei/base-uri()
   return metrics:update($url)
 };
@@ -65,9 +65,9 @@ declare function metrics:update() as xs:string* {
 declare function metrics:corpus ($corpus as xs:string) {
   let $col := collection($config:corpora-root || "/" || $corpus)
   return map {
-    "numOfTexts": count($col/tei:TEI),
-    "numOfAuthors": count(distinct-values($col//tei:titleStmt//tei:author)),
-    "numOfParagraphs": count($col//tei:body//tei:p),
+    "numOfTexts": count($col/tei:TEI[not(@type)]),
+    "numOfAuthors": count(distinct-values($col/tei:TEI[not(@type)]//tei:titleStmt//tei:author)),
+    "numOfParagraphs": count($col/tei:TEI[not(@type)]//tei:body//tei:p),
     "numOfWords": sum($col//words),
     "numOfEntities": count(distinct-values($col//entities/entity/wikidata)),
     "numOfEntityTypes": count(distinct-values($col//entities/entity/category)),

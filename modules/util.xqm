@@ -114,7 +114,7 @@ declare function ecutil:get-corpus-docs(
 ) as node()* {
   let $collection := $config:corpora-root || "/" || $corpusname
   let $col := collection($collection)
-  return $col//tei:TEI
+  return $col/tei:TEI[not(@type)]
 };
 
 (:~
@@ -186,7 +186,7 @@ declare function ecutil:create-corpus(
  :)
 declare function ecutil:get-corpus-sha($name as xs:string) as xs:string* {
   let $col := collection($config:corpora-root || "/" || $name)
-  let $num-texts := count($col/tei:TEI)
+  let $num-texts := count($col/tei:TEI[not(@type)])
   let $num-sha := count($col/git/sha)
   let $shas := distinct-values($col/git/sha)
 
