@@ -982,3 +982,112 @@ function api:text-annotation-layer(
           )
         )
 };
+
+(:~
+ : Add or replace an annotation layer for a text (admin endpoint)
+ :
+ : Stores the body as `{layerkey}.xml` in the text's annotations/
+ : subcollection. Creates the subcollection if missing. Accepts any
+ : TEI document without further validation.
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @param $layerkey Layer name (URL identifier, becomes filename)
+ : @param $data TEI document
+ : @param $auth Authorization header value
+ : @result JSON object with a confirmation message
+ :)
+declare
+  %rest:PUT("{$data}")
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/annotations/{$layerkey}")
+  %rest:header-param("Authorization", "{$auth}")
+  %rest:consumes("application/xml", "text/xml")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-annotation-layer-put(
+  $corpusname, $textname, $layerkey, $data, $auth
+) {
+  if (not($auth)) then
+    (
+      <rest:response><http:response status="401"/></rest:response>,
+      map { "message": "authorization required" }
+    )
+  else if (not(matches($layerkey, '^[a-z0-9]+(-[a-z0-9]+)*$'))) then
+    (
+      <rest:response><http:response status="400"/></rest:response>,
+      map {
+        "error": "invalid layer name",
+        "message": "Only lower case ASCII letters, digits and dashes are accepted."
+      }
+    )
+  else if (not($data/tei:TEI)) then
+    (
+      <rest:response><http:response status="400"/></rest:response>,
+      map { "error": "TEI document required" }
+    )
+  else
+    let $paths := ecutil:filepaths($corpusname, $textname)
+    let $text-collection := $paths?collections?text
+    return
+      if (not(xmldb:collection-available($text-collection))) then
+        (
+          <rest:response><http:response status="404"/></rest:response>,
+          map { "error": "no such text" }
+        )
+      else
+        let $ann-collection := xmldb:create-collection(
+          $text-collection, "annotations"
+        )
+        let $filename := $layerkey || ".xml"
+        let $existed := doc-available($ann-collection || "/" || $filename)
+        let $_ := xmldb:store($ann-collection, $filename, $data/tei:TEI)
+        return (
+          <rest:response>
+            <http:response status="{ if ($existed) then '200' else '201' }"/>
+          </rest:response>,
+          map {
+            "name": $layerkey,
+            "uri": $paths?uri || "/annotations/" || $layerkey,
+            "message": if ($existed) then "annotation layer replaced"
+                       else "annotation layer stored"
+          }
+        )
+};
+
+(:~
+ : Delete an annotation layer (admin endpoint)
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @param $layerkey Layer name
+ : @param $auth Authorization header value
+ : @result JSON object with a confirmation message
+ :)
+declare
+  %rest:DELETE
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/annotations/{$layerkey}")
+  %rest:header-param("Authorization", "{$auth}")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-annotation-layer-delete(
+  $corpusname, $textname, $layerkey, $auth
+) {
+  if (not($auth)) then
+    (
+      <rest:response><http:response status="401"/></rest:response>,
+      map { "message": "authorization required" }
+    )
+  else
+    let $paths := ecutil:filepaths($corpusname, $textname)
+    let $ann-collection := $paths?collections?text || "/annotations"
+    let $filename := $layerkey || ".xml"
+    let $file-uri := $ann-collection || "/" || $filename
+    return
+      if (not(doc-available($file-uri))) then
+        <rest:response><http:response status="404"/></rest:response>
+      else
+        let $_ := xmldb:remove($ann-collection, $filename)
+        return map { "message": "annotation layer deleted" }
+};

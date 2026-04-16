@@ -399,6 +399,64 @@ paths:
                 type: string
         '404':
           description: Text or annotation layer not found
+    put:
+      summary: Add or replace an annotation layer
+      description: >-
+        Stores the request body as `{layername}.xml` in the text's
+        annotations/ subcollection, creating the subcollection if
+        missing. Replaces on re-upload. Admin endpoint.
+
+
+        The layer name must consist of lowercase ASCII letters, digits
+        and dashes only. The request body must be a TEI document; no
+        further validation is performed.
+      operationId: put-text-annotation-layer
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/layername"
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: string
+      responses:
+        '201':
+          description: Annotation layer stored (new)
+          content:
+            application/json:
+              schema:
+                type: object
+        '200':
+          description: Annotation layer replaced
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid layer name or missing TEI document
+        '401':
+          description: Authorization required
+        '404':
+          description: Text not found
+    delete:
+      summary: Delete an annotation layer
+      description: Admin endpoint.
+      operationId: delete-text-annotation-layer
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/layername"
+      responses:
+        '200':
+          description: Layer deleted
+        '401':
+          description: Authorization required
+        '404':
+          description: Layer not found
 
   /entities/{wikidataId}:
     get:
