@@ -867,6 +867,178 @@ declare function ecdts:navigate(
       )
 };
 
+(: ========================================================================
+ : Document endpoint
+ : ======================================================================== :)
+
+(:~
+ : Build a TEI wrapper document around one or more fragments of a
+ : source TEI. Preserves the source teiHeader.
+ :)
+declare function ecdts:wrap-content(
+  $tei as element(tei:TEI),
+  $wrapper as element(dts:wrapper)
+) as element(tei:TEI) {
+  <TEI xmlns="http://www.tei-c.org/ns/1.0">
+    { $tei/tei:teiHeader }
+    <text>
+      <body>
+        { $wrapper }
+      </body>
+    </text>
+  </TEI>
+};
+
+(:~
+ : Link header value for the Document response — points back to the
+ : Resource's Collection endpoint URL. Per DTS spec.
+ :)
+declare function ecdts:document-link-header(
+  $resource-id as xs:string
+) as xs:string {
+  "&lt;" || $ecdts:collection-base || "?id="
+    || encode-for-uri($resource-id) || "&gt;; rel=&quot;collection&quot;"
+};
+
+(:~
+ : Document endpoint.
+ :
+ : Spec: https://dtsapi.org/specifications/versions/v1.0/#document-endpoint
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/dts/document")
+  %rest:query-param("resource", "{$resource}")
+  %rest:query-param("ref", "{$ref}")
+  %rest:query-param("start", "{$start}")
+  %rest:query-param("end", "{$end}")
+  %rest:query-param("tree", "{$tree}")
+  %rest:query-param("mediaType", "{$mediaType}")
+  %output:method("xml")
+function ecdts:document(
+  $resource, $ref, $start, $end, $tree, $mediaType
+) {
+  (: Parameter validation :)
+  if (not($resource)) then (
+    <rest:response><http:response status="400"/></rest:response>,
+    <error statusCode="400" xmlns="https://dtsapi.org/v1.0#">
+      <title>Bad Request</title>
+      <description>Parameter 'resource' is required.</description>
+    </error>
+  )
+  else if ($ref and ($start or $end)) then (
+    <rest:response><http:response status="400"/></rest:response>,
+    <error statusCode="400" xmlns="https://dtsapi.org/v1.0#">
+      <title>Bad Request</title>
+      <description>Parameters 'ref' and 'start'/'end' are mutually exclusive.</description>
+    </error>
+  )
+  else if (($start and not($end)) or ($end and not($start))) then (
+    <rest:response><http:response status="400"/></rest:response>,
+    <error statusCode="400" xmlns="https://dtsapi.org/v1.0#">
+      <title>Bad Request</title>
+      <description>Parameters 'start' and 'end' must be used together.</description>
+    </error>
+  )
+  else if ($mediaType and not($mediaType = "application/tei+xml")) then (
+    <rest:response><http:response status="404"/></rest:response>,
+    <error statusCode="404" xmlns="https://dtsapi.org/v1.0#">
+      <title>Not Found</title>
+      <description>mediaType '{ $mediaType }' is not supported by this resource.</description>
+    </error>
+  )
+  else
+    let $resolved := ecdts:resolve-resource-id($resource)
+    return
+      if (empty($resolved)) then (
+        <rest:response><http:response status="404"/></rest:response>,
+        <error statusCode="404" xmlns="https://dtsapi.org/v1.0#">
+          <title>Not Found</title>
+          <description>No resource with id '{ $resource }'.</description>
+        </error>
+      )
+      else
+        let $tei := $resolved?tei
+        let $link := ecdts:document-link-header($resource)
+        return
+          (: Case 1: full document :)
+          if (not($ref) and not($start) and not($end)) then (
+            <rest:response>
+              <http:response status="200">
+                <http:header name="Content-Type" value="application/tei+xml"/>
+                <http:header name="Link" value="{ $link }"/>
+              </http:response>
+            </rest:response>,
+            $tei
+          )
+          (: Case 2: fragment :)
+          else if ($ref) then
+            let $elem := ecdts:resolve-ref($tei, $resource, $ref)
+            return
+              if (empty($elem)) then (
+                <rest:response><http:response status="404"/></rest:response>,
+                <error statusCode="404" xmlns="https://dtsapi.org/v1.0#">
+                  <title>Not Found</title>
+                  <description>No CitableUnit with ref '{ $ref }'.</description>
+                </error>
+              )
+              else (
+                <rest:response>
+                  <http:response status="200">
+                    <http:header name="Content-Type" value="application/tei+xml"/>
+                    <http:header name="Link" value="{ $link }"/>
+                  </http:response>
+                </rest:response>,
+                ecdts:wrap-content($tei,
+                  <dts:wrapper xmlns:dts="https://dtsapi.org/v1.0#" ref="{ $ref }">
+                    { $elem }
+                  </dts:wrapper>
+                )
+              )
+          (: Case 3: range :)
+          else
+            let $start-elem := ecdts:resolve-ref($tei, $resource, $start)
+            let $end-elem := ecdts:resolve-ref($tei, $resource, $end)
+            return
+              if (empty($start-elem) or empty($end-elem)) then (
+                <rest:response><http:response status="404"/></rest:response>,
+                <error statusCode="404" xmlns="https://dtsapi.org/v1.0#">
+                  <title>Not Found</title>
+                  <description>Could not resolve start or end ref.</description>
+                </error>
+              )
+              else if (not($start-elem/.. is $end-elem/..)) then (
+                <rest:response><http:response status="501"/></rest:response>,
+                <error statusCode="501" xmlns="https://dtsapi.org/v1.0#">
+                  <title>Not Implemented</title>
+                  <description>Ranges spanning different parents are not yet supported.</description>
+                </error>
+              )
+              else
+                let $siblings := $start-elem/../*
+                let $start-pos := count($start-elem/preceding-sibling::*) + 1
+                let $end-pos := count($end-elem/preceding-sibling::*) + 1
+                let $range := $siblings[
+                  position() >= $start-pos and position() <= $end-pos
+                ]
+                return (
+                  <rest:response>
+                    <http:response status="200">
+                      <http:header name="Content-Type" value="application/tei+xml"/>
+                      <http:header name="Link" value="{ $link }"/>
+                    </http:response>
+                  </rest:response>,
+                  ecdts:wrap-content($tei,
+                    <dts:wrapper
+                      xmlns:dts="https://dtsapi.org/v1.0#"
+                      start="{ $start }"
+                      end="{ $end }">
+                      { $range }
+                    </dts:wrapper>
+                  )
+                )
+};
+
 (:~
  : Collection endpoint dispatcher.
  :
