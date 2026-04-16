@@ -606,7 +606,7 @@ function api:text-tei-put($corpusname, $textname, $data, $auth) {
       let $result := xmldb:store($collection, "tei.xml", $data/tei:TEI)
       let $_ := (
         ecutil:remove-corpus-sha($corpusname),
-        ecutil:remove-sha($corpusname, $playname)
+        ecutil:remove-sha($corpusname, $textname)
       )
       return $data
 };

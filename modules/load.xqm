@@ -29,11 +29,11 @@ declare function local:store(
     let $res := if ($name = "corpus") then
       xmldb:store($collection, "corpus.xml", $data)
     else
-      let $play-collection := xmldb:create-collection($collection, $name)
+      let $text-collection := xmldb:create-collection($collection, $name)
       return try {
-        xmldb:store($play-collection, "tei.xml", $data),
+        xmldb:store($text-collection, "tei.xml", $data),
         if ($sha) then
-          xmldb:store($play-collection, "git.xml", <git><sha>{$sha}</sha></git>)
+          xmldb:store($text-collection, "git.xml", <git><sha>{$sha}</sha></git>)
         else ()
       } catch * {
         util:log-system-out($err:description)
