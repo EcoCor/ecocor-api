@@ -607,6 +607,24 @@ paths:
         target one or the other. Filters combine with AND. At least
         one of `q`, `title`, or `author` is required.
       operationId: get-search-metadata
+  /search/tokens:
+    get:
+      summary: Search tokens by surface form
+      description: >-
+        Full-text search over `<w>` tokens in the tokenized TEI. Each
+        hit includes the list of annotations that target that token
+        (from any layer) — so the client can see **which layers detected
+        it**, by which `layerType`, and with what body.
+
+
+        The optional `annotated` flag filters results to tokens that
+        have at least one annotation (`true`) or none (`false`).
+
+
+        Uses Lucene full-text indexing on `tei:w`. Standard Lucene
+        syntax — wildcards like `Biber*` catch inflections and
+        compounds ("Biber", "Bibern", "Biberrepublik", …).
+      operationId: get-search-tokens
       tags: [search]
       parameters:
         - name: q
@@ -642,6 +660,37 @@ paths:
           in: query
           required: false
           description: Restrict search to a single corpus
+          required: true
+          description: Surface-form query (Lucene syntax)
+          schema:
+            type: string
+          examples:
+            exact:
+              value: Biber
+            wildcard:
+              value: "Biber*"
+            phrase:
+              value: '"guter Mann"'
+        - name: annotated
+          in: query
+          required: false
+          description: >-
+            Filter by annotation presence. `true` keeps only tokens
+            with at least one annotation, `false` keeps only tokens
+            with none. Omit to return all matches.
+          schema:
+            type: string
+            enum: [true, false]
+        - name: corpus
+          in: query
+          required: false
+          description: Restrict to a single corpus
+          schema:
+            type: string
+        - name: id
+          in: query
+          required: false
+          description: Restrict to a single resource (DTS public id)
           schema:
             type: string
         - name: limit
@@ -651,6 +700,7 @@ paths:
           schema:
             type: integer
             default: 50
+            default: 20
         - name: offset
           in: query
           required: false
@@ -669,6 +719,15 @@ paths:
           description: No filter parameter supplied
         '404':
           description: Corpus not found
+          description: Token search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenSearchResults'
+        '400':
+          description: Parameter `q` missing or `annotated` invalid
+        '404':
+          description: Corpus or resource not found
 
   /entities/{wikidataId}:
     get:
@@ -1335,11 +1394,13 @@ components:
         - kwic
         - document
     MetadataSearchResults:
+    TokenSearchResults:
       type: object
       properties:
         query:
           type: object
           description: Echo of the filters that were applied
+          description: Echo of the parameters that were applied
         totalHits:
           type: integer
         offset:
@@ -1350,6 +1411,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MetadataHit'
+            $ref: '#/components/schemas/TokenSearchHit'
       required:
         - query
         - totalHits
@@ -1357,6 +1419,7 @@ components:
         - limit
         - results
     MetadataHit:
+    TokenSearchHit:
       type: object
       properties:
         id:
@@ -1382,8 +1445,76 @@ components:
           type: string
           format: url
           description: DTS Collection URL for the resource
+        token:
+          type: object
+          properties:
+            id:
+              type: string
+            text:
+              type: string
+              description: Surface form
+            type:
+              type: string
+              enum: [w, pc]
+          required:
+            - id
+            - text
+            - type
+        citableUnit:
+          type: string
+          description: >-
+            Containing paragraph xml:id — usable as `ref` in the DTS
+            Navigation / Document endpoints.
+        annotations:
+          type: array
+          description: >-
+            All annotations targeting this token, flattened across
+            layers. Each entry carries the layer name, the layer's
+            `listAnnotation/@type` (semantic kind — `entities`,
+            `linguistic`, …), and a body of key/value pairs from the
+            annotation attributes and notes.
+          items:
+            type: object
+            properties:
+              layer:
+                type: string
+                description: Layer name (filename without .xml)
+              layerType:
+                type: string
+                description: >-
+                  From `listAnnotation/@type`. Multiple layers can share
+                  a type (e.g. `dictionarylookup` and `ntee` both have
+                  `layerType=entities`).
+              body:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                    - key
+                    - value
+            required:
+              - layer
+              - layerType
+              - body
+        tokenUri:
+          type: string
+          format: url
+          description: Link to the single-token endpoint
+        document:
+          type: string
+          format: url
+          description: >-
+            DTS Document URL pointing at the containing paragraph.
+            Absent if the token is not inside a `<p>` with an xml:id.
       required:
         - id
         - name
         - corpus
         - title
+        - token
+        - annotations
