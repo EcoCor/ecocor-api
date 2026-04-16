@@ -146,16 +146,16 @@ function search:search(
 
 (:~
  : Token-surface search. Finds `<w>` tokens matching a Lucene query,
- : optionally filtered to tokens that have (or don't have) any
- : annotation from any layer.
+ : optionally filtered to tokens that carry an annotation from a layer
+ : of a given `listAnnotation/@type` (e.g. `entities`).
  :
- : Each result carries the list of annotations on the token — clients
- : see which layers detected the token (and the annotation body
- : key/value pairs).
+ : Each result carries the list of annotations on the token across all
+ : layers — so clients see which layers detected it and with what body.
  :
  : @param $q Surface-form query (Lucene syntax, required)
- : @param $annotated "true" / "false" to filter by annotation presence;
- :                    omit to return all matches
+ : @param $layerType Restrict to tokens annotated by a layer whose
+ :                   `listAnnotation/@type` equals this value (e.g.
+ :                   "entities"). Omit to return all matches.
  : @param $corpus Optional corpus name
  : @param $id Optional resource id (public form)
  : @param $limit Results per page (default 20)
@@ -165,7 +165,7 @@ declare
   %rest:GET
   %rest:path("/ecocor/search/tokens")
   %rest:query-param("q", "{$q}")
-  %rest:query-param("annotated", "{$annotated}")
+  %rest:query-param("layerType", "{$layerType}")
   %rest:query-param("corpus", "{$corpus}")
   %rest:query-param("id", "{$id}")
   %rest:query-param("limit", "{$limit}")
@@ -175,7 +175,7 @@ declare
   %output:method("json")
 function search:tokens(
   $q as xs:string*,
-  $annotated as xs:string*,
+  $layerType as xs:string*,
   $corpus as xs:string*,
   $id as xs:string*,
   $limit as xs:string*,
@@ -185,14 +185,6 @@ function search:tokens(
     (
       <rest:response><http:response status="400"/></rest:response>,
       map { "error": "Bad Request", "message": "Parameter 'q' is required." }
-    )
-  else if ($annotated and not($annotated = ("true", "false"))) then
-    (
-      <rest:response><http:response status="400"/></rest:response>,
-      map {
-        "error": "Bad Request",
-        "message": "Parameter 'annotated' must be 'true' or 'false'."
-      }
     )
   else
 
@@ -230,11 +222,10 @@ function search:tokens(
         else
           let $all-hits := $scope//tei:w[ft:query(., $q)]
 
-          (: annotation filter: keep/drop tokens that have annotations :)
-          let $filtered := if ($annotated = "true") then
-            $all-hits[search:has-annotation(.)]
-          else if ($annotated = "false") then
-            $all-hits[not(search:has-annotation(.))]
+          (: layer-type filter: keep only tokens with ≥1 annotation from
+             a layer where listAnnotation/@type = $layerType :)
+          let $filtered := if ($layerType) then
+            $all-hits[search:has-annotation-of-type(., $layerType)]
           else
             $all-hits
 
@@ -283,7 +274,7 @@ function search:tokens(
             map {
               "query": map:merge((
                 map:entry("q", $q),
-                if ($annotated) then map:entry("annotated", $annotated) else (),
+                if ($layerType) then map:entry("layerType", $layerType) else (),
                 if ($corpus) then map:entry("corpus", $corpus) else (),
                 if ($id) then map:entry("id", $id) else ()
               )),
@@ -296,11 +287,12 @@ function search:tokens(
 };
 
 (:~
- : True if the token (its xml:id) is referenced by any annotation in
- : any layer of the containing text's annotations/ subcollection.
+ : True if the token carries at least one annotation from a layer
+ : whose `listAnnotation/@type` equals `$layer-type`.
  :)
-declare function search:has-annotation(
-  $token as element(tei:w)
+declare function search:has-annotation-of-type(
+  $token as element(tei:w),
+  $layer-type as xs:string
 ) as xs:boolean {
   let $tei := $token/ancestor::tei:TEI
   let $segments := tokenize(base-uri($tei), '/')
@@ -311,9 +303,9 @@ declare function search:has-annotation(
     else
       let $target-ref := "#" || string($token/@xml:id)
       return exists(
-        collection($ann-collection)//tei:annotation[
-          tokenize(@target, '\s+') = $target-ref
-        ]
+        collection($ann-collection)
+          //tei:listAnnotation[@type = $layer-type]
+          //tei:annotation[tokenize(@target, '\s+') = $target-ref]
       )
 };
 
