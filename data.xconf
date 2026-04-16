@@ -3,6 +3,7 @@
   <index xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tei="http://www.tei-c.org/ns/1.0">
     <lucene>
       <text qname="tei:p"/>
+      <text qname="tei:w"/>
       <text qname="tei:title"/>
       <text qname="tei:author"/>
     </lucene>
