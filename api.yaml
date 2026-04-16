@@ -746,6 +746,87 @@ paths:
         '404':
           description: Corpus or resource not found
 
+  /search/tokens:
+    get:
+      summary: Search tokens by surface form
+      description: >-
+        Full-text search over `<w>` tokens in the tokenized TEI. Each
+        hit includes the list of annotations that target that token
+        (from any layer) — so the client can see **which layers detected
+        it**, by which `layerType`, and with what body.
+
+
+        The optional `annotated` flag filters results to tokens that
+        have at least one annotation (`true`) or none (`false`).
+
+
+        Uses Lucene full-text indexing on `tei:w`. Standard Lucene
+        syntax — wildcards like `Biber*` catch inflections and
+        compounds ("Biber", "Bibern", "Biberrepublik", …).
+      operationId: get-search-tokens
+      tags: [search]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Surface-form query (Lucene syntax)
+          schema:
+            type: string
+          examples:
+            exact:
+              value: Biber
+            wildcard:
+              value: "Biber*"
+            phrase:
+              value: '"guter Mann"'
+        - name: annotated
+          in: query
+          required: false
+          description: >-
+            Filter by annotation presence. `true` keeps only tokens
+            with at least one annotation, `false` keeps only tokens
+            with none. Omit to return all matches.
+          schema:
+            type: string
+            enum: [true, false]
+        - name: corpus
+          in: query
+          required: false
+          description: Restrict to a single corpus
+          schema:
+            type: string
+        - name: id
+          in: query
+          required: false
+          description: Restrict to a single resource (DTS public id)
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Results per page
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          description: Zero-based offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Token search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenSearchResults'
+        '400':
+          description: Parameter `q` missing or `annotated` invalid
+        '404':
+          description: Corpus or resource not found
+
 components:
   parameters:
     corpusname:
@@ -1374,3 +1455,107 @@ components:
         - name
         - corpus
         - title
+    TokenSearchResults:
+      type: object
+      properties:
+        query:
+          type: object
+          description: Echo of the parameters that were applied
+        totalHits:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TokenSearchHit'
+      required:
+        - query
+        - totalHits
+        - offset
+        - limit
+        - results
+    TokenSearchHit:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Resource id (DTS public form)
+        name:
+          type: string
+        corpus:
+          type: string
+        token:
+          type: object
+          properties:
+            id:
+              type: string
+            text:
+              type: string
+              description: Surface form
+            type:
+              type: string
+              enum: [w, pc]
+          required:
+            - id
+            - text
+            - type
+        citableUnit:
+          type: string
+          description: >-
+            Containing paragraph xml:id — usable as `ref` in the DTS
+            Navigation / Document endpoints.
+        annotations:
+          type: array
+          description: >-
+            All annotations targeting this token, flattened across
+            layers. Each entry carries the layer name, the layer's
+            `listAnnotation/@type` (semantic kind — `entities`,
+            `linguistic`, …), and a body of key/value pairs from the
+            annotation attributes and notes.
+          items:
+            type: object
+            properties:
+              layer:
+                type: string
+                description: Layer name (filename without .xml)
+              layerType:
+                type: string
+                description: >-
+                  From `listAnnotation/@type`. Multiple layers can share
+                  a type (e.g. `dictionarylookup` and `ntee` both have
+                  `layerType=entities`).
+              body:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: string
+                    value:
+                      type: string
+                  required:
+                    - key
+                    - value
+            required:
+              - layer
+              - layerType
+              - body
+        tokenUri:
+          type: string
+          format: url
+          description: Link to the single-token endpoint
+        document:
+          type: string
+          format: url
+          description: >-
+            DTS Document URL pointing at the containing paragraph.
+            Absent if the token is not inside a `<p>` with an xml:id.
+      required:
+        - id
+        - name
+        - corpus
+        - token
+        - annotations
