@@ -1091,3 +1091,154 @@ function api:text-annotation-layer-delete(
         let $_ := xmldb:remove($ann-collection, $filename)
         return map { "message": "annotation layer deleted" }
 };
+
+(:~
+ : List all tokens (<w> and <pc>) of a text
+ :
+ : Source: {text}/tokenized.xml. Returns 404 if that document is missing.
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @param $format Output format: "json" (default) or "tsv"
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/tokens")
+  %rest:query-param("format", "{$format}", "json")
+function api:text-tokens($corpusname, $textname, $format) {
+  let $paths := ecutil:filepaths($corpusname, $textname)
+  let $tokenized-file := $paths?collections?text || "/tokenized.xml"
+  let $tokenized := if (doc-available($tokenized-file)) then doc($tokenized-file) else ()
+
+  return
+    if (not($tokenized)) then (
+      <rest:response><http:response status="404"/></rest:response>,
+      map {
+        "error": "tokenized TEI not found",
+        "message": "No tokenized.xml for text '" || $textname
+          || "' in corpus '" || $corpusname
+          || "'. This endpoint requires a tokenized TEI (with <w>/<pc> elements) alongside the base tei.xml."
+      }
+    )
+    else
+      let $tokens := $tokenized//tei:text//(tei:w|tei:pc)
+      return if ($format = "tsv") then
+        let $header := string-join(("id", "text", "type"), "&#9;")
+        let $rows :=
+          for $token in $tokens
+          return string-join((
+            string($token/@xml:id),
+            string($token),
+            local-name($token)
+          ), "&#9;")
+        return (
+          <rest:response>
+            <http:response status="200">
+              <http:header name="Content-Type" value="text/tab-separated-values; charset=utf-8"/>
+            </http:response>
+          </rest:response>,
+          string-join(($header, $rows), "&#10;")
+        )
+      else (
+        <rest:response>
+          <http:response status="200">
+            <http:header name="Content-Type" value="application/json"/>
+          </http:response>
+        </rest:response>,
+        serialize(
+          array {
+            for $token in $tokens
+            return map:merge((
+              map {
+                "id": string($token/@xml:id),
+                "text": string($token),
+                "type": local-name($token)
+              },
+              if ($token/@unit) then map:entry("unit", string($token/@unit)) else ()
+            ))
+          },
+          map { "method": "json" }
+        )
+      )
+};
+
+(:~
+ : Get a single token with all annotations
+ :
+ : Looks up the token in tokenized.xml by xml:id and aggregates all
+ : annotations targeting it across every layer in annotations/. The
+ : annotations array is flat; each entry carries its layer name.
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @param $tokenid Token xml:id
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/tokens/{$tokenid}")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-token($corpusname, $textname, $tokenid) {
+  let $paths := ecutil:filepaths($corpusname, $textname)
+  let $tokenized-file := $paths?collections?text || "/tokenized.xml"
+  let $tokenized := if (doc-available($tokenized-file)) then doc($tokenized-file) else ()
+  let $token :=
+    if ($tokenized) then
+      $tokenized//(tei:w|tei:pc)[@xml:id = $tokenid]
+    else ()
+
+  return
+    if (not($tokenized)) then (
+      <rest:response><http:response status="404"/></rest:response>,
+      map {
+        "error": "tokenized TEI not found",
+        "message": "No tokenized.xml for text '" || $textname
+          || "' in corpus '" || $corpusname || "'."
+      }
+    )
+    else if (not($token)) then (
+      <rest:response><http:response status="404"/></rest:response>,
+      map {
+        "error": "token not found",
+        "message": "No <w> or <pc> element with xml:id='" || $tokenid
+          || "' in text '" || $textname || "'."
+      }
+    )
+    else
+      let $ann-collection := $paths?collections?text || "/annotations"
+      let $target-ref := "#" || $tokenid
+      return map:merge((
+        map {
+          "id": $tokenid,
+          "text": string($token),
+          "type": local-name($token)
+        },
+        if ($token/@unit) then map:entry("unit", string($token/@unit)) else (),
+        if (xmldb:collection-available($ann-collection)) then
+          map:entry("annotations", array {
+            for $resource in xmldb:get-child-resources($ann-collection)
+            let $doc := doc($ann-collection || "/" || $resource)
+            let $layername := replace($resource, '\.xml$', '')
+            for $a in $doc//tei:annotation[
+              tokenize(@target, '\s+') = $target-ref
+            ]
+            return map {
+              "layer": $layername,
+              "body": array {
+                for $attr in $a/(@ana, @corresp)
+                return map {
+                  "key": local-name($attr),
+                  "value": string($attr)
+                },
+                for $note in $a/tei:note[@type]
+                return map {
+                  "key": string($note/@type),
+                  "value": normalize-space($note)
+                }
+              }
+            }
+          })
+        else ()
+      ))
+};
