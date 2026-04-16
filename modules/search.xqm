@@ -205,48 +205,36 @@ function search:metadata(
     else
       let $teis := collection($collection-path)//tei:TEI[@type = "tokenized"]
 
-      (: pre-extract metadata once per TEI so we don't parse twice :)
-      let $matches :=
-        for $tei in $teis
-        let $titles := ectei:get-titles($tei)
-        let $authors := ectei:get-authors($tei)
-        let $title-text := lower-case($titles?main)
-        let $author-text := lower-case(string-join(
-          for $a in $authors return $a?name, " "
-        ))
-        let $q-match :=
-          not($q) or
-          contains($title-text, lower-case($q)) or
-          contains($author-text, lower-case($q))
-        let $title-match :=
-          not($title) or
-          contains($title-text, lower-case($title))
-        let $author-match :=
-          not($author) or
-          contains($author-text, lower-case($author))
-        where $q-match and $title-match and $author-match
-        return map {
-          "tei": $tei,
-          "titles": $titles,
-          "authors": $authors
-        }
+      (: Lucene ft:query on tei:title and tei:author inside titleStmt :)
+      let $matches := $teis[
+        (not($q)
+          or .//tei:titleStmt/tei:title[ft:query(., $q)]
+          or .//tei:titleStmt/tei:author[ft:query(., $q)])
+        and
+        (not($title)
+          or .//tei:titleStmt/tei:title[ft:query(., $title)])
+        and
+        (not($author)
+          or .//tei:titleStmt/tei:author[ft:query(., $author)])
+      ]
 
       let $total := count($matches)
       let $page := subsequence($matches, $off + 1, $lim)
       let $dts-base := $config:api-base || "/dts"
 
       let $results := array {
-        for $m in $page
-        let $tei := $m?tei
+        for $tei in $page
         let $resource-id := search:resource-id($tei)
+        let $titles := ectei:get-titles($tei)
+        let $authors := ectei:get-authors($tei)
         let $paths := ecutil:filepaths(base-uri($tei))
         return map {
           "id": $resource-id,
           "name": $paths?textname,
           "corpus": $paths?corpusname,
-          "title": $m?titles?main,
+          "title": $titles?main,
           "authors": array {
-            for $a in $m?authors return map { "name": $a?name }
+            for $a in $authors return map { "name": $a?name }
           },
           "uri": $paths?uri,
           "collection": $dts-base || "/collection?id=" || $resource-id
