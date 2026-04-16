@@ -24,7 +24,7 @@ declare function local:store(
     let $collection := $param[1]
     let $sha := $param[2]
     let $filename := tokenize($path, "/")[last()]
-    let $name := lower-case(replace($filename, "\.xml$", ""))
+    let $name := replace($filename, "\.xml$", "")
     let $log := util:log-system-out("LOADING " || $path)
     let $res := if ($name = "corpus") then
       xmldb:store($collection, "corpus.xml", $data)
