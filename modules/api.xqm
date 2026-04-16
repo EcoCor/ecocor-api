@@ -17,9 +17,31 @@ declare namespace json = "http://www.w3.org/2013/XSL/json";
 declare namespace tei = "http://www.tei-c.org/ns/1.0";
 
 (:~
- : API info
+ : API base
  :
  : Shows version numbers of the ecocor-api app and the underlying eXist-db.
+ :
+ : @result JSON object
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor")
+  %rest:produces("application/json")
+  %output:method("json")
+function api:base() {
+  let $expath := config:expath-descriptor()
+  let $repo := config:repo-descriptor()
+  return map {
+    "name": $expath/expath:title/string(),
+    "version": $expath/@version/string(),
+    "existdb": system:get-version(),
+    "base": $config:api-base
+  }
+};
+
+(:~
+ : API info
+ :
  :
  : @result JSON object
  :)
@@ -30,15 +52,7 @@ declare
   %output:media-type("application/json")
   %output:method("json")
 function api:info() {
-  let $expath := config:expath-descriptor()
-  let $repo := config:repo-descriptor()
-  return map {
-    "name": $expath/expath:title/string(),
-    "version": $expath/@version/string(),
-    "status": $repo/repo:status/string(),
-    "existdb": system:get-version(),
-    "base": $config:api-base
-  }
+  api:base()
 };
 
 (:~
@@ -76,7 +90,7 @@ declare
   %output:method("json")
 function api:corpora() {
   array {
-    for $corpus in collection($config:data-root)//tei:teiCorpus
+    for $corpus in collection($config:corpora-root)//tei:teiCorpus
     let $info := ectei:get-corpus-info($corpus)
     let $name := $info?name
     order by $name
@@ -113,10 +127,8 @@ function api:corpora-post-tei($data, $auth) {
     )
   else
 
-  let $header := $data//tei:teiCorpus/tei:teiHeader
-  let $name := $header//tei:publicationStmt/tei:idno[
-    @type = "URI" and @xml:base = "https://ecocor.org/"
-  ]/text()
+  let $header := if ($data) then $data//tei:teiCorpus/tei:teiHeader else ()
+  let $name := $header//tei:publicationStmt/tei:idno[not(@type)][1]/text()
 
   let $title := $header//tei:titleStmt/tei:title[1]/text()
 
@@ -158,19 +170,11 @@ function api:corpora-post-tei($data, $auth) {
         "error": "corpus already exists"
       }
     ) else (
-      let $tei-dir := concat($config:data-root, '/', $name)
-      return (
-        util:log-system-out("creating corpus"),
-        util:log-system-out($data),
-        xmldb:create-collection($config:data-root, $name),
-        xmldb:create-collection($config:entities-root, $name),
-        xmldb:create-collection($config:metrics-root, $name),
-        xmldb:store($tei-dir, "corpus.xml", $data),
-        map {
-          "name": $name,
-          "title": $title
-        }
-      )
+      ecutil:create-corpus($name, $data/tei:teiCorpus),
+      map {
+        "name": $name,
+        "title": $title
+      }
     )
 };
 
@@ -183,11 +187,23 @@ function api:corpora-post-tei($data, $auth) {
 declare
   %rest:POST("{$data}")
   %rest:path("/ecocor/corpora")
+  %rest:header-param("Authorization", "{$auth}")
   %rest:consumes("application/json")
   %rest:produces("application/json")
   %output:media-type("application/json")
   %output:method("json")
-function api:corpora-post-json($data) {
+function api:corpora-post-json($data, $auth) {
+  if (not($auth)) then
+    (
+      <rest:response>
+        <http:response status="401"/>
+      </rest:response>,
+      map {
+        "message": "authorization required"
+      }
+    )
+  else
+
   let $json := parse-json(util:base64-decode($data))
   let $name := $json?name
   let $description := $json?description
@@ -221,45 +237,10 @@ function api:corpora-post-json($data) {
         "message": "Only lower case ASCII letters and digits are accepted."
       }
     )
-  else
-    let $corpus :=
-      <teiCorpus xmlns="http://www.tei-c.org/ns/1.0">
-        <teiHeader>
-          <fileDesc>
-            <titleStmt>
-              <title>{$json?title}</title>
-            </titleStmt>
-            <publicationStmt>
-              <idno type="URI" xml:base="https://ecocor.org/">{$name}</idno>
-              {
-                if ($json?repository)
-                then <idno type="repo">{$json?repository}</idno>
-                else ()
-              }
-            </publicationStmt>
-          </fileDesc>
-          {if ($json?description) then (
-            <encodingDesc>
-              <projectDesc>
-                {
-                  for $p in tokenize($json?description, "&#10;&#10;")
-                  return <p>{$p}</p>
-                }
-              </projectDesc>
-            </encodingDesc>
-          ) else ()}
-        </teiHeader>
-      </teiCorpus>
-    let $tei-dir := concat($config:data-root, '/', $name)
-    return (
-      util:log-system-out("creating corpus"),
-      util:log-system-out($corpus),
-      xmldb:create-collection($config:data-root, $name),
-      xmldb:create-collection($config:entities-root, $name),
-      xmldb:create-collection($config:metrics-root, $name),
-      xmldb:store($tei-dir, "corpus.xml", $corpus),
-      $json
-    )
+  else (
+    ecutil:create-corpus($json),
+    $json
+  )
 };
 
 (:~
@@ -277,7 +258,7 @@ declare
 function api:corpus-data($corpusname) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
   let $metrics := metrics:corpus($corpusname)
-  let $collection := concat($config:data-root, "/", $corpusname)
+  let $collection := concat($config:corpora-root, "/", $corpusname)
   return
     if (not($corpus?name) or not(xmldb:collection-available($collection))) then
       <rest:response>
@@ -289,6 +270,79 @@ function api:corpus-data($corpusname) {
         map {"metrics": $metrics}
       ))
 };
+
+(:~
+ : Update corpus.xml
+ :
+ : Sending a PUT request to the corpus URI updates the corpus.xml file of the
+ : corpus with the payload. This endpoint requires authorization.
+ :
+ : @param $corpusname Corpus name
+ : @param $auth Authorization header value
+ : @result JSON object
+ :)
+declare
+  %rest:PUT("{$data}")
+  %rest:path("/ecocor/corpora/{$corpusname}")
+  %rest:header-param("Authorization", "{$auth}")
+  %rest:consumes("application/xml", "text/xml")
+  %output:method("json")
+function api:put-corpus($corpusname, $data, $auth) {
+  if (not($auth)) then
+    (
+      <rest:response>
+        <http:response status="401"/>
+      </rest:response>,
+      map {
+        "error": "authorization required"
+      }
+    )
+  else
+
+  let $corpus := ectei:get-corpus($corpusname)
+
+  return
+    if (not($corpus)) then
+      (
+        <rest:response>
+          <http:response status="404"/>
+        </rest:response>,
+        map {
+          "error": "No such corpus"
+        }
+      )
+    else if (not($data/tei:teiCorpus)) then
+      (
+        <rest:response>
+          <http:response status="400"/>
+        </rest:response>,
+        map {
+          "error": "teiCorpus document required"
+        }
+      )
+    else if (
+      not(
+        $data/tei:teiCorpus/tei:teiHeader/tei:fileDesc/tei:publicationStmt
+          /tei:idno[not(@type)][1] eq $corpusname
+      )
+    )
+    then
+      (
+        <rest:response>
+          <http:response status="400"/>
+        </rest:response>,
+        map {
+          "error": "Corpus name mismatch",
+          "message": "The corpus name in the payload differs from the one in the resource path."
+        }
+      )
+    else
+      let $collection := $config:corpora-root || "/" || $corpusname
+      let $result := xmldb:store($collection, "corpus.xml", $data/tei:teiCorpus)
+      let $newCorpus := ectei:get-corpus-info-by-name($corpusname)
+      return $newCorpus
+};
+
 
 (:~
  : Load corpus data from its repository
@@ -395,13 +449,11 @@ function api:delete-corpus($corpusname, $auth) {
         <http:response status="404"/>
       </rest:response>
     else
-      let $url := $config:data-root || "/" || $corpusname || "/corpus.xml"
+      let $url := $config:corpora-root || "/" || $corpusname || "/corpus.xml"
       return
         if ($url = $corpus/base-uri()) then
         (
-          xmldb:remove($config:data-root || "/" || $corpusname),
-          xmldb:remove($config:entities-root || "/" || $corpusname),
-          xmldb:remove($config:metrics-root || "/" || $corpusname),
+          xmldb:remove($config:corpora-root || "/" || $corpusname),
           map {
             "message": "corpus deleted",
             "uri": $url
@@ -429,7 +481,7 @@ declare
   %output:method("json")
 function api:corpus-texts($corpusname) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
-  let $collection := concat($config:data-root, "/", $corpusname)
+  let $collection := concat($config:corpora-root, "/", $corpusname)
   return
     if (not($corpus?name) or not(xmldb:collection-available($collection))) then
       <rest:response>
@@ -454,7 +506,7 @@ declare
   %output:method("json")
 function api:corpus-entities($corpusname, $type) {
   let $corpus := ectei:get-corpus-info-by-name($corpusname)
-  let $collection := concat($config:data-root, "/", $corpusname)
+  let $collection := concat($config:corpora-root, "/", $corpusname)
   return
     if (not($corpus?name) or not(xmldb:collection-available($collection))) then
       <rest:response>
@@ -548,8 +600,14 @@ function api:text-tei-put($corpusname, $textname, $data, $auth) {
       )
     else
       let $filename := $textname || ".xml"
-      let $collection := $config:data-root || "/" || $corpusname
-      let $result := xmldb:store($collection, $filename, $data/tei:TEI)
+      let $collection := xmldb:create-collection(
+        $config:corpora-root || "/" || $corpusname, $textname
+      )
+      let $result := xmldb:store($collection, "tei.xml", $data/tei:TEI)
+      let $_ := (
+        ecutil:remove-corpus-sha($corpusname),
+        ecutil:remove-sha($corpusname, $playname)
+      )
       return $data
 };
 
@@ -573,17 +631,16 @@ function api:text-delete($corpusname, $textname, $data, $auth) {
     </rest:response>
   else
 
-  let $doc := ecutil:get-doc($corpusname, $textname)
+  let $paths := ecutil:filepaths($corpusname, $textname)
 
   return
-    if (not($doc)) then
+    if (not(doc($paths?files?tei))) then
       <rest:response>
         <http:response status="404"/>
       </rest:response>
     else
-      let $filename := $textname || ".xml"
-      let $collection := $config:data-root || "/" || $corpusname
-      return (xmldb:remove($collection, $filename))
+      ecutil:remove-corpus-sha($corpusname),
+      xmldb:remove($paths?collections?text)
 };
 
 (:~
@@ -678,33 +735,6 @@ function api:text-plain($corpusname, $textname) {
   return
     if (count($doc)) then
       ectei:get-plain-text($corpusname, $textname)
-    else
-      <rest:response>
-        <http:response status="404"/>
-      </rest:response>
-};
-
-(:~
- : Get segments for a single text
- :
- : This provides a JSON object that can serve as payload for the extractor
- : service.
- :
- : @param $corpusname Corpus name
- : @param $textname Text name
- : @result JSON object
- :)
-declare
-  %rest:GET
-  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/segments")
-  %rest:produces("application/json")
-  %output:media-type("application/json")
-  %output:method("json")
-function api:text-segments($corpusname, $textname) {
-  let $doc := ecutil:get-doc($corpusname, $textname)
-  return
-    if (count($doc)) then
-      entities:segment($doc/tei:TEI)
     else
       <rest:response>
         <http:response status="404"/>
