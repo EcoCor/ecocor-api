@@ -612,13 +612,17 @@ paths:
       summary: Search tokens by surface form
       description: >-
         Full-text search over `<w>` tokens in the tokenized TEI. Each
-        hit includes the list of annotations that target that token
-        (from any layer) — so the client can see **which layers detected
-        it**, by which `layerType`, and with what body.
+        hit includes the list of annotations that target the token
+        (from any layer) — so the client can see **which layers
+        detected it**, by which `layerType`, and with what body.
 
 
-        The optional `annotated` flag filters results to tokens that
-        have at least one annotation (`true`) or none (`false`).
+        The optional `layerType` filter narrows results to tokens that
+        carry an annotation from at least one layer whose
+        `listAnnotation/@type` equals the given value. For entity-type
+        queries, use `layerType=entities` — this excludes the
+        linguistic layer (which annotates every token) so the result
+        reflects what entity taggers actually caught.
 
 
         Uses Lucene full-text indexing on `tei:w`. Standard Lucene
@@ -671,16 +675,20 @@ paths:
               value: "Biber*"
             phrase:
               value: '"guter Mann"'
-        - name: annotated
+        - name: layerType
           in: query
           required: false
           description: >-
-            Filter by annotation presence. `true` keeps only tokens
-            with at least one annotation, `false` keeps only tokens
-            with none. Omit to return all matches.
+            Filter to tokens annotated by at least one layer whose
+            `listAnnotation/@type` matches this value. `entities` is
+            the common case (excludes the linguistic layer).
           schema:
             type: string
-            enum: [true, false]
+          examples:
+            entities:
+              value: entities
+            linguistic:
+              value: linguistic
         - name: corpus
           in: query
           required: false
@@ -725,7 +733,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TokenSearchResults'
         '400':
-          description: Parameter `q` missing or `annotated` invalid
+          description: Parameter `q` missing
         '404':
           description: Corpus or resource not found
 
