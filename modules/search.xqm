@@ -143,3 +143,128 @@ function search:search(
             "results": $results
           }
 };
+
+(:~
+ : Metadata search — title and author substring match across texts.
+ :
+ : Unlike the fulltext /search endpoint (which returns paragraph hits),
+ : this returns text-level hits with bibliographic metadata.
+ :
+ : @param $q Matches in title OR author (substring, case-insensitive)
+ : @param $title Substring match on title
+ : @param $author Substring match on author names
+ : @param $corpus Optional corpus name to restrict search
+ : @param $limit Results per page (default 50)
+ : @param $offset Zero-based offset (default 0)
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/search/metadata")
+  %rest:query-param("q", "{$q}")
+  %rest:query-param("title", "{$title}")
+  %rest:query-param("author", "{$author}")
+  %rest:query-param("corpus", "{$corpus}")
+  %rest:query-param("limit", "{$limit}")
+  %rest:query-param("offset", "{$offset}")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function search:metadata(
+  $q as xs:string*,
+  $title as xs:string*,
+  $author as xs:string*,
+  $corpus as xs:string*,
+  $limit as xs:string*,
+  $offset as xs:string*
+) as item()+ {
+  let $lim := if ($limit) then xs:integer($limit) else 50
+  let $off := if ($offset) then xs:integer($offset) else 0
+
+  let $collection-path :=
+    if ($corpus and $corpus != "")
+    then $config:corpora-root || "/" || $corpus
+    else $config:corpora-root
+
+  return
+    if ($corpus and not(xmldb:collection-available($collection-path))) then
+      (
+        <rest:response><http:response status="404"/></rest:response>,
+        map {
+          "error": "Not Found",
+          "message": "Corpus '" || $corpus || "' does not exist."
+        }
+      )
+    else if (not($q) and not($title) and not($author)) then
+      (
+        <rest:response><http:response status="400"/></rest:response>,
+        map {
+          "error": "Bad Request",
+          "message": "At least one of 'q', 'title', or 'author' is required."
+        }
+      )
+    else
+      let $teis := collection($collection-path)//tei:TEI[@type = "tokenized"]
+
+      (: pre-extract metadata once per TEI so we don't parse twice :)
+      let $matches :=
+        for $tei in $teis
+        let $titles := ectei:get-titles($tei)
+        let $authors := ectei:get-authors($tei)
+        let $title-text := lower-case($titles?main)
+        let $author-text := lower-case(string-join(
+          for $a in $authors return $a?name, " "
+        ))
+        let $q-match :=
+          not($q) or
+          contains($title-text, lower-case($q)) or
+          contains($author-text, lower-case($q))
+        let $title-match :=
+          not($title) or
+          contains($title-text, lower-case($title))
+        let $author-match :=
+          not($author) or
+          contains($author-text, lower-case($author))
+        where $q-match and $title-match and $author-match
+        return map {
+          "tei": $tei,
+          "titles": $titles,
+          "authors": $authors
+        }
+
+      let $total := count($matches)
+      let $page := subsequence($matches, $off + 1, $lim)
+      let $dts-base := $config:api-base || "/dts"
+
+      let $results := array {
+        for $m in $page
+        let $tei := $m?tei
+        let $resource-id := search:resource-id($tei)
+        let $paths := ecutil:filepaths(base-uri($tei))
+        return map {
+          "id": $resource-id,
+          "name": $paths?textname,
+          "corpus": $paths?corpusname,
+          "title": $m?titles?main,
+          "authors": array {
+            for $a in $m?authors return map { "name": $a?name }
+          },
+          "uri": $paths?uri,
+          "collection": $dts-base || "/collection?id=" || $resource-id
+        }
+      }
+
+      return map:merge((
+        map {
+          "query": map:merge((
+            if ($q) then map:entry("q", $q) else (),
+            if ($title) then map:entry("title", $title) else (),
+            if ($author) then map:entry("author", $author) else (),
+            if ($corpus) then map:entry("corpus", $corpus) else ()
+          )),
+          "totalHits": $total,
+          "offset": $off,
+          "limit": $lim,
+          "results": $results
+        }
+      ))
+};
