@@ -23,6 +23,8 @@ tags:
     description: Analyze a text.
   - name: entities
     description: Analyze occurrences of animals and plants in corpora and texts.
+  - name: annotations
+    description: Stand-off annotation layers on texts.
   - name: admin
     description: Manage corpora.
 
@@ -325,6 +327,33 @@ paths:
           description: Returns a plain text document
           content:
             text/plain:
+
+  /corpora/{corpusname}/texts/{textname}/annotations:
+    get:
+      summary: List stand-off annotation layers for a text
+      description: >-
+        Returns a list of annotation layers available for the text, with
+        metadata extracted from each layer's TEI header. The `name` field
+        comes from the filename (stable URL identifier); the `type` field
+        comes from `listAnnotation/@type` and describes the semantic kind
+        of annotations — multiple layers can share the same type (e.g.
+        `dictionarylookup` and `ntee` both have `type=entities`).
+      operationId: get-text-annotations
+      tags: [annotations]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+      responses:
+        '200':
+          description: Returns an array of annotation layer objects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnnotationLayer'
+        '404':
+          description: Text not found or no annotations subcollection
 
   /entities/{wikidataId}:
     get:
@@ -678,3 +707,51 @@ components:
         uri:
           type: string
           format: url
+    AnnotationLayer:
+      type: object
+      properties:
+        name:
+          type: string
+          description: >-
+            Layer identifier (filename without .xml). Stable URL
+            identifier used in /annotations/{layername}.
+        type:
+          type: string
+          description: >-
+            Annotation type from listAnnotation/@type. Multiple layers
+            can have the same type (e.g. dictionarylookup and ntee both
+            have type=entities).
+        size:
+          type: integer
+          description: Number of annotation elements in the layer
+        categoryCounts:
+          type: object
+          description: >-
+            Per-category count (keys are @ana values with leading #
+            stripped, values are counts).
+          additionalProperties:
+            type: integer
+        uri:
+          type: string
+          format: url
+        title:
+          type: string
+        licence:
+          type: string
+          format: url
+        source:
+          type: string
+          description: Filename of the base TEI this layer annotates
+        application:
+          type: object
+          properties:
+            ident:
+              type: string
+            version:
+              type: string
+      required:
+        - name
+        - type
+        - size
+        - categoryCounts
+        - uri

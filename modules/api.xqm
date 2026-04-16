@@ -740,3 +740,71 @@ function api:text-plain($corpusname, $textname) {
         <http:response status="404"/>
       </rest:response>
 };
+
+(:~
+ : List stand-off annotation layers for a text
+ :
+ : Returns an array of layer metadata objects. The layer name comes from
+ : the filename in the text's annotations/ subcollection (not from
+ : listAnnotation/@type, which is exposed separately as "type").
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result JSON array of annotation layer objects
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/annotations")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-annotations($corpusname, $textname) {
+  let $paths := ecutil:filepaths($corpusname, $textname)
+  let $text-collection := $paths?collections?text
+  let $ann-collection := $text-collection || "/annotations"
+
+  return
+    if (not(xmldb:collection-available($text-collection))) then
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+    else if (not(xmldb:collection-available($ann-collection))) then
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+    else
+      array {
+        for $resource in xmldb:get-child-resources($ann-collection)
+        let $doc := doc($ann-collection || "/" || $resource)
+        let $name := replace($resource, '\.xml$', '')
+        let $header := $doc//tei:teiHeader
+        let $type := string($doc//tei:listAnnotation/@type)
+        let $title := $header//tei:titleStmt/tei:title[1]/string()
+        let $licence := $header//tei:availability/tei:licence/@target/string()
+        let $source := $header//tei:sourceDesc/tei:bibl/tei:ref[@type="source"]/@target/string()
+        let $app := $header//tei:appInfo/tei:application
+        let $annotations := $doc//tei:annotation
+        order by $name
+        return map:merge((
+          map {
+            "name": $name,
+            "type": $type,
+            "size": count($annotations),
+            "categoryCounts": map:merge(
+              for $a in $annotations
+              let $cat := replace(string($a/@ana), '^#', '')
+              group by $cat
+              return map:entry($cat, count($a))
+            ),
+            "uri": $paths?uri || "/annotations/" || $name
+          },
+          if ($title) then map:entry("title", $title) else (),
+          if ($licence) then map:entry("licence", $licence) else (),
+          if ($source) then map:entry("source", $source) else (),
+          if ($app) then map:entry("application", map {
+            "ident": $app/@ident/string(),
+            "version": $app/@version/string()
+          }) else ()
+        ))
+      }
+};
