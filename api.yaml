@@ -23,6 +23,8 @@ tags:
     description: Analyze a text.
   - name: entities
     description: Analyze occurrences of animals and plants in corpora and texts.
+  - name: tokens
+    description: Word and punctuation tokens from the tokenized TEI.
   - name: admin
     description: Manage corpora.
 
@@ -326,6 +328,59 @@ paths:
           content:
             text/plain:
 
+  /corpora/{corpusname}/texts/{textname}/tokens:
+    get:
+      summary: List all tokens of a text
+      description: >-
+        Returns all `<w>` and `<pc>` tokens from the tokenized base TEI
+        (`tokenized.xml`) in document order. The `unit` field is only
+        present on punctuation tokens that carry `@unit` (e.g. "sentence").
+      operationId: get-text-tokens
+      tags: [tokens]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/format"
+      responses:
+        '200':
+          description: Returns token list as JSON (default) or TSV
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Token'
+            text/tab-separated-values:
+              schema:
+                type: string
+        '404':
+          description: Tokenized TEI not found
+
+  /corpora/{corpusname}/texts/{textname}/tokens/{tokenid}:
+    get:
+      summary: Get a single token with all annotations
+      description: >-
+        Looks up the token in `tokenized.xml` by xml:id and aggregates
+        all annotations that target it across every layer in the
+        text's annotations/ subcollection. The `annotations` array is
+        flat; each entry carries its `layer` name and a `body` of
+        key-value pairs.
+      operationId: get-text-token
+      tags: [tokens]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+        - $ref: "#/components/parameters/tokenid"
+      responses:
+        '200':
+          description: Returns the token with its annotations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenWithAnnotations'
+        '404':
+          description: Token not found
+
   /entities/{wikidataId}:
     get:
       summary: Get single entity
@@ -454,6 +509,29 @@ components:
       required: true
       schema:
         type: string
+    tokenid:
+      name: tokenid
+      in: path
+      required: true
+      description: >
+        Token xml:id as found in the tokenized base TEI.
+      schema:
+        type: string
+      examples:
+        pinien:
+          value: eco_de_000033_140_0730
+          summary: "Pinien (Kleist: Das Erdbeben in Chili)"
+    format:
+      name: format
+      in: query
+      required: false
+      description: >
+        Output format. Default is "json". Use "tsv" for a
+        tab-separated table.
+      schema:
+        type: string
+        enum: [json, tsv]
+        default: json
   schemas:
     Info:
       type: object
@@ -678,3 +756,54 @@ components:
         uri:
           type: string
           format: url
+    Token:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Token xml:id
+        text:
+          type: string
+          description: Surface form
+        type:
+          type: string
+          enum: [w, pc]
+          description: Element type (word or punctuation)
+        unit:
+          type: string
+          description: Punctuation unit (e.g. "sentence"), only on pc tokens
+      required:
+        - id
+        - text
+        - type
+    TokenWithAnnotations:
+      allOf:
+        - $ref: '#/components/schemas/Token'
+        - type: object
+          properties:
+            annotations:
+              type: array
+              description: >-
+                Annotations from all layers targeting this token. Each
+                entry carries the layer name and a body of key-value
+                pairs (from @ana, @corresp, and note[@type]).
+              items:
+                type: object
+                properties:
+                  layer:
+                    type: string
+                  body:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        value:
+                          type: string
+                      required:
+                        - key
+                        - value
+                required:
+                  - layer
+                  - body
