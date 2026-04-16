@@ -23,6 +23,8 @@ tags:
     description: Analyze a text.
   - name: entities
     description: Analyze occurrences of animals and plants in corpora and texts.
+  - name: search
+    description: Full-text search over corpora and texts.
   - name: admin
     description: Manage corpora.
 
@@ -325,6 +327,82 @@ paths:
           description: Returns a plain text document
           content:
             text/plain:
+
+  /search:
+    get:
+      summary: Full-text search across corpora and texts
+      description: >-
+        Paragraph-level Lucene full-text search over the tokenized TEI
+        of every text. Returns hits with KWIC context and URLs into
+        the DTS Collection, Navigation and Document endpoints. The
+        query syntax is Lucene's standard query parser — supports
+        phrases, boolean operators, wildcards, proximity etc.
+
+
+        Optionally restrict to a single corpus with `corpus=<name>` or
+        to a single text with `id=<resource-id>` (the DTS resource id,
+        matching `TEI/@xml:id` with the `_tokenized` suffix stripped).
+      operationId: get-search
+      tags: [search]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query (Lucene syntax)
+          schema:
+            type: string
+          examples:
+            nachtigall:
+              value: Nachtigall
+            phrase:
+              value: '"im Wipfel"'
+            boolean:
+              value: "Nachtigall OR Lerche"
+        - name: corpus
+          in: query
+          required: false
+          description: Restrict search to a single corpus
+          schema:
+            type: string
+          examples:
+            german:
+              value: de
+        - name: id
+          in: query
+          required: false
+          description: >-
+            Restrict search to a single resource. The public DTS
+            resource id (not the internal `_tokenized` form).
+          schema:
+            type: string
+          examples:
+            kleist:
+              value: eco_de_000033
+        - name: limit
+          in: query
+          required: false
+          description: Number of results per page
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          description: Zero-based offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Search result page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+        '400':
+          description: Parameter `q` missing
+        '404':
+          description: Corpus or resource not found
 
   /entities/{wikidataId}:
     get:
@@ -678,3 +756,72 @@ components:
         uri:
           type: string
           format: url
+    SearchResults:
+      type: object
+      properties:
+        query:
+          type: string
+        totalHits:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+      required:
+        - query
+        - totalHits
+        - offset
+        - limit
+        - results
+    SearchHit:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Resource id (DTS public form)
+        name:
+          type: string
+          description: Text slug (e.g. 1807_kleist_erdbeben)
+        corpus:
+          type: string
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+        citableUnit:
+          type: string
+          description: >-
+            Paragraph xml:id — usable as `ref` in DTS Navigation and
+            Document endpoints.
+        kwic:
+          type: string
+          description: Keyword-in-context snippet
+        collection:
+          type: string
+          format: url
+          description: DTS Collection URL for the resource
+        navigation:
+          type: string
+          format: url
+          description: DTS Navigation URL for the matching citable unit
+        document:
+          type: string
+          format: url
+          description: DTS Document URL for the matching citable unit
+      required:
+        - id
+        - name
+        - corpus
+        - title
+        - citableUnit
+        - kwic
+        - document
