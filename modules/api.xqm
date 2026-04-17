@@ -1091,6 +1091,8 @@ function api:text-annotation-layer-delete(
         let $_ := xmldb:remove($ann-collection, $filename)
         return map { "message": "annotation layer deleted" }
 };
+
+(:~
  : List all tokens (<w> and <pc>) of a text
  :
  : Source: {text}/tokenized.xml. Returns 404 if that document is missing.
