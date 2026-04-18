@@ -58,7 +58,7 @@ declare function local:create-secrets-file ()
 as item()? {
   if(doc($config:secrets-file)/secrets) then
     ()
-  else
+  else (
     util:log-system-out("Creating " || $config:secrets-file),
     local:store(
       $config:secrets-file,
@@ -67,6 +67,7 @@ as item()? {
       </secrets>
     ),
     sm:chmod(xs:anyURI($config:secrets-file), 'rw-------')
+  )
 };
 
 (: elevate privileges for github webhook :)
