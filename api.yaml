@@ -29,6 +29,17 @@ tags:
     description: Word and punctuation tokens from the tokenized TEI.
   - name: search
     description: Full-text search over corpora and texts.
+  - name: dts
+    description: >-
+      Distributed Text Services v1.0 API. Four endpoints — Entry Point,
+      Collection, Navigation, Document — for programmatic access to
+      tokenized TEI texts along their citation structure. See
+      https://dtsapi.org/specifications/versions/v1.0/.
+  - name: aggregate
+    description: >-
+      Pre-computed, per-text summaries of annotation data. Reads are
+      served from a cached XML representation and are O(1) on cache
+      size; POST triggers recomputation (admin only).
   - name: admin
     description: Manage corpora.
 
@@ -835,6 +846,339 @@ paths:
         '404':
           description: Corpus or resource not found
 
+  /dts:
+    get:
+      summary: DTS Entry Point
+      description: >-
+        Advertises URI templates for the Collection, Navigation and
+        Document endpoints so clients can discover them.
+
+
+        Spec: https://dtsapi.org/specifications/versions/v1.0/#entry-endpoint
+      operationId: get-dts-entry
+      tags: [dts]
+      responses:
+        '200':
+          description: JSON-LD Entry Point document
+          content:
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/DtsEntryPoint'
+
+  /dts/collection:
+    get:
+      summary: DTS Collection endpoint
+      description: >-
+        Lists a collection and its members. Without `id`, returns the
+        root collection (one member per corpus). With `id` set to a
+        corpus name, returns the corpus' texts; with `id` set to a
+        Resource id, returns that text as a leaf Resource.
+
+
+        Spec: https://dtsapi.org/specifications/versions/v1.0/#collection-endpoint
+      operationId: get-dts-collection
+      tags: [dts]
+      parameters:
+        - name: id
+          in: query
+          required: false
+          description: Collection or Resource id.
+          schema:
+            type: string
+          examples:
+            corpus:
+              value: de
+              summary: German corpus
+            resource:
+              value: eco_de_000033
+              summary: "Kleist: Das Erdbeben in Chili"
+        - name: nav
+          in: query
+          required: false
+          description: Navigate to parents instead of children.
+          schema:
+            type: string
+            enum: [children, parents]
+            default: children
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-based).
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: JSON-LD Collection document
+          content:
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/DtsCollection'
+        '404':
+          description: Collection id not found
+
+  /dts/navigation:
+    get:
+      summary: DTS Navigation endpoint
+      description: >-
+        Returns the citation tree (or a subtree) for a Resource.
+        `resource` is required. `ref` selects a single citable unit;
+        `start`/`end` select a range. `down` controls descent depth;
+        `tree=true` returns the full structural subtree.
+
+
+        Spec: https://dtsapi.org/specifications/versions/v1.0/#navigation-endpoint
+      operationId: get-dts-navigation
+      tags: [dts]
+      parameters:
+        - name: resource
+          in: query
+          required: true
+          description: Resource id (public form, no `_tokenized` suffix).
+          schema:
+            type: string
+          examples:
+            kleist:
+              value: eco_de_000033
+        - name: ref
+          in: query
+          required: false
+          description: A single citable unit's identifier.
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          description: Start of a range of citable units.
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          description: End of a range of citable units.
+          schema:
+            type: string
+        - name: down
+          in: query
+          required: false
+          description: >-
+            Depth of descent into the citation tree. Use `-1` for the
+            full tree.
+          schema:
+            type: integer
+            default: 1
+        - name: tree
+          in: query
+          required: false
+          description: Request the full structural tree.
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-based).
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: JSON-LD Navigation document
+          content:
+            application/ld+json:
+              schema:
+                $ref: '#/components/schemas/DtsNavigation'
+        '400':
+          description: Parameter `resource` missing or `ref`/`start`+`end` mutually exclusive rule violated.
+        '404':
+          description: Resource not found
+
+  /dts/document:
+    get:
+      summary: DTS Document endpoint
+      description: >-
+        Returns TEI XML for a Resource or citable unit. Without `ref`,
+        `start`, or `end`, returns the full tokenized TEI. `ref`
+        returns one citable unit; `start`/`end` return a range.
+        `mediaType` is accepted for spec conformance but only TEI XML
+        is served.
+
+
+        Spec: https://dtsapi.org/specifications/versions/v1.0/#document-endpoint
+      operationId: get-dts-document
+      tags: [dts]
+      parameters:
+        - name: resource
+          in: query
+          required: true
+          description: Resource id (public form).
+          schema:
+            type: string
+          examples:
+            kleist:
+              value: eco_de_000033
+        - name: ref
+          in: query
+          required: false
+          description: A single citable unit's identifier.
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: false
+          description: Start of a range of citable units.
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          description: End of a range of citable units.
+          schema:
+            type: string
+        - name: tree
+          in: query
+          required: false
+          description: Request the full structural tree.
+          schema:
+            type: boolean
+        - name: mediaType
+          in: query
+          required: false
+          description: Accepted for spec conformance; only TEI XML is served.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TEI XML document (wrapped in `<dts:wrapper>` when a fragment).
+          content:
+            application/tei+xml:
+              schema:
+                type: string
+            application/xml:
+              schema:
+                type: string
+        '400':
+          description: Parameter `resource` missing or range arguments invalid.
+        '404':
+          description: Resource or citable unit not found
+
+  /aggregate/entities:
+    get:
+      summary: Read cached entity aggregate
+      description: >-
+        Returns the pre-computed entity aggregate for a corpus or a
+        single text. Requires `corpus`. With `id`, returns the aggregate
+        for that one text; without `id`, merges every cached text in
+        the corpus (summing `mentionCount` and counting distinct
+        `textCount` per entity).
+
+
+        Entities are grouped by lemma. Each entry carries the lemma
+        key, surface forms seen, categories (`@ana` values from
+        annotations), layers that detected the entity, and Wikidata
+        ids where known.
+
+
+        Caches must exist beforehand — POST to this endpoint first.
+      operationId: get-aggregate-entities
+      tags: [aggregate]
+      parameters:
+        - name: corpus
+          in: query
+          required: true
+          description: Corpus name.
+          schema:
+            type: string
+          examples:
+            german:
+              value: de
+        - name: id
+          in: query
+          required: false
+          description: Restrict to a single text (Resource id, public form).
+          schema:
+            type: string
+          examples:
+            kleist:
+              value: eco_de_000033
+        - name: category
+          in: query
+          required: false
+          description: >-
+            Filter to entities of this category (the `@ana` value
+            without leading `#`).
+          schema:
+            type: string
+          examples:
+            plant:
+              value: cat-plant
+            animal:
+              value: cat-animal
+        - name: limit
+          in: query
+          required: false
+          description: Page size.
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          description: Zero-based offset.
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Aggregate result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityAggregate'
+        '400':
+          description: Parameter `corpus` missing
+        '404':
+          description: >-
+            Corpus not found, or no aggregate cached yet (POST first).
+    post:
+      summary: Compute and cache entity aggregates (admin)
+      description: >-
+        Triggers computation. Without `id`, computes every text in the
+        corpus that has an entity-type annotation layer. With `id`,
+        computes one text. Results are stored at
+        `{corpus}/{text}/aggregates/entities.xml` and served by
+        subsequent GETs.
+
+
+        Admin endpoint — requires `Authorization` header.
+      operationId: post-aggregate-entities
+      tags: [admin]
+      parameters:
+        - name: corpus
+          in: query
+          required: true
+          description: Corpus name.
+          schema:
+            type: string
+        - name: id
+          in: query
+          required: false
+          description: Restrict to a single text (Resource id, public form).
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Aggregate computed and stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregateComputeResult'
+        '400':
+          description: Parameter `corpus` missing
+        '401':
+          description: Authorization required
+        '404':
+          description: Corpus or text not found
+
 components:
   parameters:
     corpusname:
@@ -1567,3 +1911,228 @@ components:
         - corpus
         - token
         - annotations
+    DtsEntryPoint:
+      type: object
+      description: >-
+        JSON-LD Entry Point document as defined by the DTS v1.0
+        specification.
+      properties:
+        '@context':
+          type: string
+          format: url
+        '@id':
+          type: string
+          format: url
+        '@type':
+          type: string
+          enum: [EntryPoint]
+        dtsVersion:
+          type: string
+          example: "1.0"
+        collection:
+          type: string
+          description: URI template for the Collection endpoint
+        navigation:
+          type: string
+          description: URI template for the Navigation endpoint
+        document:
+          type: string
+          description: URI template for the Document endpoint
+      required:
+        - '@context'
+        - '@id'
+        - '@type'
+        - dtsVersion
+        - collection
+        - navigation
+        - document
+    DtsCollection:
+      type: object
+      description: >-
+        JSON-LD Collection document as defined by the DTS v1.0
+        specification. Represents either a collection (`@type:
+        Collection`) or a leaf `Resource`.
+      properties:
+        '@context':
+          type: string
+          format: url
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [Collection, Resource]
+        dtsVersion:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        totalParents:
+          type: integer
+        totalChildren:
+          type: integer
+        member:
+          type: array
+          description: Child collections or resources.
+          items:
+            type: object
+        collection:
+          type: string
+          description: URI template for following Collection links.
+      required:
+        - '@context'
+        - '@id'
+        - '@type'
+        - dtsVersion
+    DtsNavigation:
+      type: object
+      description: >-
+        JSON-LD Navigation document as defined by the DTS v1.0
+        specification. Describes the citation structure of a Resource.
+      properties:
+        '@context':
+          type: string
+          format: url
+        '@id':
+          type: string
+        '@type':
+          type: string
+          enum: [Navigation]
+        dtsVersion:
+          type: string
+        resource:
+          type: object
+          description: The Resource this Navigation describes.
+        member:
+          type: array
+          description: Citable units at the requested depth.
+          items:
+            type: object
+      required:
+        - '@context'
+        - '@type'
+        - dtsVersion
+    EntityAggregate:
+      type: object
+      description: >-
+        Entity aggregate for a corpus or single text. Entities are
+        grouped by lemma.
+      properties:
+        scope:
+          type: object
+          properties:
+            corpus:
+              type: string
+            id:
+              type: string
+              description: >-
+                Present only when the aggregate is scoped to a single
+                text.
+          required:
+            - corpus
+        groupBy:
+          type: string
+          enum: [lemma]
+          description: >-
+            Only `lemma` is currently supported; future versions may
+            add other groupings.
+        computed:
+          type: string
+          format: date-time
+          description: >-
+            When the per-text cache was last computed. Single-text
+            responses carry this; corpus-merged responses do not.
+        totalMentions:
+          type: integer
+          description: Sum of `mentionCount` across `entities`.
+        distinctEntities:
+          type: integer
+          description: Number of distinct entity keys.
+        offset:
+          type: integer
+        limit:
+          type: integer
+        entities:
+          type: array
+          items:
+            $ref: '#/components/schemas/AggregateEntity'
+      required:
+        - scope
+        - groupBy
+        - totalMentions
+        - distinctEntities
+        - offset
+        - limit
+        - entities
+    AggregateEntity:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Lemma — the grouping key.
+        mentionCount:
+          type: integer
+          description: Total occurrences across the scope.
+        textCount:
+          type: integer
+          description: Number of distinct texts where the entity appears.
+        texts:
+          type: array
+          items:
+            type: string
+          description: Resource ids that contain the entity.
+        surfaceForms:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
+          description: Annotation `@ana` values without leading `#`.
+        wikidataIds:
+          type: array
+          items:
+            type: string
+        layers:
+          type: array
+          items:
+            type: string
+          description: Annotation layer names that detected the entity.
+      required:
+        - key
+        - mentionCount
+        - textCount
+    AggregateComputeResult:
+      type: object
+      properties:
+        message:
+          type: string
+        computed:
+          type: string
+          format: date-time
+        textCount:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              distinctEntities:
+                type: integer
+              totalMentions:
+                type: integer
+              stored:
+                type: string
+                description: Path of the stored aggregate XML.
+            required:
+              - id
+              - distinctEntities
+              - totalMentions
+      required:
+        - message
+        - computed
+        - textCount
+        - results
