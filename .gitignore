@@ -3,3 +3,10 @@ build/
 .existdb.json
 expath-pkg.xml
 ecocor-latest.xar
+.venv/
+.venv-dts/
+.hypothesis/
+.pytest_cache/
+*.log
+dts-report.html
+*-report.html
