@@ -63,15 +63,24 @@ function search:search(
   $limit as xs:string*,
   $offset as xs:string*
 ) as item()+ {
+  (: Normalize multi-valued params (e.g. ?offset=1&offset=2 → 2-item
+     sequence) to first value; safely default numeric casts. :)
+  let $q := $q[1]
+  let $corpus := $corpus[1]
+  let $id := $id[1]
+  let $lim :=
+    let $v := $limit[1]
+    return if ($v castable as xs:integer) then xs:integer($v) else 20
+  let $off :=
+    let $v := $offset[1]
+    return if ($v castable as xs:integer) then xs:integer($v) else 0
+  return
   if (not($q) or $q = "") then
     (
       <rest:response><http:response status="400"/></rest:response>,
       map { "error": "Bad Request", "message": "Parameter 'q' is required." }
     )
   else
-
-  let $lim := if ($limit) then xs:integer($limit) else 20
-  let $off := if ($offset) then xs:integer($offset) else 0
 
   let $collection-path :=
     if ($corpus and $corpus != "")
@@ -102,7 +111,7 @@ function search:search(
               "message": "Text '" || $id || "' does not exist."
             }
           )
-        else
+        else try {
           let $hits := $scope//tei:p[ft:query(., $q)]
           let $total := count($hits)
           let $page := subsequence($hits, $off + 1, $lim)
@@ -142,6 +151,15 @@ function search:search(
             "limit": $lim,
             "results": $results
           }
+        } catch * {
+          (
+            <rest:response><http:response status="400"/></rest:response>,
+            map {
+              "error": "Bad Request",
+              "message": "Invalid search query: " || $err:description
+            }
+          )
+        }
 };
 
 (:~
@@ -177,8 +195,17 @@ function search:metadata(
   $limit as xs:string*,
   $offset as xs:string*
 ) as item()+ {
-  let $lim := if ($limit) then xs:integer($limit) else 50
-  let $off := if ($offset) then xs:integer($offset) else 0
+  (: Normalize multi-valued params to first value; safe numeric casts. :)
+  let $q := $q[1]
+  let $title := $title[1]
+  let $author := $author[1]
+  let $corpus := $corpus[1]
+  let $lim :=
+    let $v := $limit[1]
+    return if ($v castable as xs:integer) then xs:integer($v) else 50
+  let $off :=
+    let $v := $offset[1]
+    return if ($v castable as xs:integer) then xs:integer($v) else 0
 
   let $collection-path :=
     if ($corpus and $corpus != "")
@@ -202,7 +229,7 @@ function search:metadata(
           "message": "At least one of 'q', 'title', or 'author' is required."
         }
       )
-    else
+    else try {
       let $teis := collection($collection-path)//tei:TEI[@type = "tokenized"]
 
       (: Lucene ft:query on tei:title and tei:author inside titleStmt :)
@@ -255,6 +282,15 @@ function search:metadata(
           "results": $results
         }
       ))
+    } catch * {
+      (
+        <rest:response><http:response status="400"/></rest:response>,
+        map {
+          "error": "Bad Request",
+          "message": "Invalid search query: " || $err:description
+        }
+      )
+    }
 };
 
 (:~
@@ -294,15 +330,24 @@ function search:tokens(
   $limit as xs:string*,
   $offset as xs:string*
 ) as item()+ {
+  (: Normalize multi-valued params to first value; safe numeric casts. :)
+  let $q := $q[1]
+  let $layerType := $layerType[1]
+  let $corpus := $corpus[1]
+  let $id := $id[1]
+  let $lim :=
+    let $v := $limit[1]
+    return if ($v castable as xs:integer) then xs:integer($v) else 20
+  let $off :=
+    let $v := $offset[1]
+    return if ($v castable as xs:integer) then xs:integer($v) else 0
+  return
   if (not($q) or $q = "") then
     (
       <rest:response><http:response status="400"/></rest:response>,
       map { "error": "Bad Request", "message": "Parameter 'q' is required." }
     )
   else
-
-  let $lim := if ($limit) then xs:integer($limit) else 20
-  let $off := if ($offset) then xs:integer($offset) else 0
 
   let $collection-path :=
     if ($corpus and $corpus != "")
@@ -332,7 +377,7 @@ function search:tokens(
               "message": "Text '" || $id || "' does not exist."
             }
           )
-        else
+        else try {
           let $all-hits := $scope//tei:w[ft:query(., $q)]
 
           (: layer-type filter: keep only tokens with ≥1 annotation from
@@ -397,6 +442,15 @@ function search:tokens(
               "results": $results
             }
           ))
+        } catch * {
+          (
+            <rest:response><http:response status="400"/></rest:response>,
+            map {
+              "error": "Bad Request",
+              "message": "Invalid search query: " || $err:description
+            }
+          )
+        }
 };
 
 (:~
