@@ -1295,22 +1295,46 @@ components:
   schemas:
     Info:
       type: object
+      title: API info
+      description: >-
+        Version and environment information for the running EcoCor API.
+        Pulled from the expath-pkg.xml descriptor (name/version) and
+        eXist's `system:get-version()`. The `base` field is the API's
+        own base URL.
+      x-ecocor-api-function: "api:base"
       properties:
-        version:
-          type: string
         name:
           type: string
-        status:
+          description: App title from `expath-pkg.xml`.
+        version:
           type: string
+          description: App version from `expath-pkg.xml`.
         existdb:
           type: string
+          description: Running eXist-db version.
+        base:
+          type: string
+          format: url
+          description: API base URL (from `$config:api-base`).
+      required:
+        - name
+        - version
+        - existdb
+        - base
     CorpusMetrics:
       type: object
+      title: Corpus-level metrics
+      description: >-
+        Aggregate counts and indicators for a corpus, computed live from
+        the TEI collection and pre-computed metric files.
+      x-ecocor-api-function: "metrics:corpus"
       properties:
         numOfTexts:
           type: integer
+          description: Number of texts in the corpus.
         numOfParagraphs:
           type: integer
+          description: Total `<p>` count across all texts.
         numOfWords:
           type: number
           description: >-
@@ -1319,62 +1343,147 @@ components:
             `xs:double`; the handler returns e.g. `6727355.0`.
         numOfAuthors:
           type: integer
+          description: Distinct author names across the corpus.
         numOfEntities:
           type: integer
+          description: Distinct Wikidata-identified entities.
         numOfEntityTypes:
           type: integer
+          description: Distinct entity categories (animal, plant, ...).
+        numOfAnimals:
+          type: integer
+          description: Distinct entities with category `Animal`.
+        numOfPlants:
+          type: integer
+          description: Distinct entities with category `Plant`.
         biodiversityIndex:
           type: number
+          description: >-
+            Placeholder value; currently always 0 (index computation
+            not yet implemented).
     Corpus:
       type: object
+      title: Corpus
+      description: >-
+        Metadata for one corpus, assembled from the corpus's `teiCorpus`
+        teiHeader plus live-computed metrics. `metrics` is merged in
+        from `metrics:corpus`.
+      x-ecocor-api-function: "ectei:get-corpus-info"
       properties:
         name:
           type: string
+          description: >-
+            Short corpus name, from `publicationStmt/idno[not(@type)]`.
+            Used as the URL segment.
         title:
           type: string
+          description: Corpus title from `titleStmt/title[1]`.
         acronym:
           type: string
+          description: >-
+            Short label from `titleStmt/title[@type="acronym"]`, if
+            present.
         description:
           type: string
+          description: >-
+            Rendered Markdown of `encodingDesc/projectDesc//p`,
+            paragraph-joined.
         repository:
           type: string
           format: url
+          description: Git repository URL from `idno[@type="repo"]`.
         licence:
           type: string
+          description: Licence label from `availability/licence`.
         licenceUrl:
           type: string
           format: url
+          description: Licence URL from `availability/licence/@target`.
+        uri:
+          type: string
+          format: url
+          description: >-
+            Canonical API URL for this corpus
+            (`<api-base>/corpora/<name>`).
         metrics:
           $ref: '#/components/schemas/CorpusMetrics'
         textsUrl:
           type: string
           format: url
+          description: URL of the texts listing for this corpus.
         entitiesUrl:
           type: string
           format: url
+          description: URL of the entities listing for this corpus.
         updated:
           type: string
+          description: >-
+            ISO timestamp of the last git update for the corpus
+            (from the repo's `git.xml`).
       required:
         - name
         - title
-        - repository
         - textsUrl
         - entitiesUrl
-        - updated
-    ExternalReferenceResourceId:
+    Source:
       type: object
+      title: Bibliographic source
+      description: >-
+        One entry from a text's `sourceDesc` (typically a
+        `digitalSource`, `printSource`, or `firstEdition` bibl). All
+        fields besides `bibl` are optional and depend on what the TEI
+        header provides.
+      x-ecocor-api-function: "ectei:get-sources"
       properties:
         type:
           type: string
-        ref:
+          description: >-
+            The `@type` attribute of the source `<bibl>`, e.g.
+            `digitalSource`, `printSource`, `firstEdition`.
+        bibl:
           type: string
+          description: The normalized text of the `<bibl>` element.
+        title:
+          type: string
+        author:
+          type: string
+        publisher:
+          type: string
+        placePublished:
+          type: string
+        year:
+          type: string
+          description: >-
+            Publication year as a string — may be a range
+            (e.g. "1795/1796") so declared as `string`.
+        links:
+          type: array
+          description: External links (`<ref>` children of the bibl).
+          items:
+            type: object
+            properties:
+              url:
+                type: string
+                format: url
+              text:
+                type: string
+      required:
+        - bibl
     TextMetrics:
       type: object
+      title: Text-level metrics
+      description: >-
+        Per-text counts derived from the TEI body and pre-computed
+        entity tables. Embedded in the `Text` response via the `metrics`
+        property.
+      x-ecocor-api-function: "metrics:text"
       properties:
         numOfChapters:
           type: integer
+          description: Count of `<div type="chapter">` elements.
         numOfParagraphs:
           type: integer
+          description: Count of `<p>` elements in the body.
         numOfWords:
           type: number
           description: >-
@@ -1382,99 +1491,115 @@ components:
             `CorpusMetrics.numOfWords`.
         numOfEntities:
           type: integer
+          description: Distinct Wikidata-identified entities in this text.
         numOfEntityTypes:
           type: integer
+          description: Distinct entity categories detected in this text.
+        numOfAnimals:
+          type: integer
+          description: Distinct entities with category `Animal`.
+        numOfPlants:
+          type: integer
+          description: Distinct entities with category `Plant`.
         biodiversityIndex:
           type: number
+          description: >-
+            Placeholder value; currently always 0.
     Author:
       type: object
+      title: Author
+      description: >-
+        One author entry from the TEI `titleStmt/author`. Multiple
+        authors can appear per text; illustrators are excluded.
+      x-ecocor-api-function: "ectei:get-authors"
       properties:
         name:
           type: string
+          description: >-
+            Author name with any trailing parentheses (dates etc.)
+            stripped.
         ref:
           type: string
           format: url
-          description: Wikidata URI
-        gender:
-          type: string
+          description: >-
+            Wikidata URI from `author/@ref`, if the TEI encodes one.
       required:
         - name
-    DigitalSource:
-      type: object
-      properties:
-        url:
-          type: string
-          format: url
-        name:
-          type: string
-      required:
-        - url
-    PrintSource:
-      type: object
-      properties:
-        publisher:
-          type: string
-        placePublished:
-          type: string
-        yearPublished:
-          type: integer
-        title:
-          type: string
-    Dates:
-      type: object
-      properties:
-        yearWritten:
-          type: string
-          nullable: true
-        yearPrinted:
-          type: string
-          nullable: true
-        yearNormalized:
-          type: integer
-          nullable: true
     Text:
       type: object
+      title: Text
+      description: >-
+        Metadata for one text, built from its TEI header plus live
+        metrics and git commit info. `metrics` is merged from
+        `metrics:text`, `sources` from `ectei:get-sources`, and
+        `authors` from `ectei:get-authors`.
+      x-ecocor-api-function: "ectei:get-text-info"
       properties:
         id:
           type: string
+          description: Public resource id (TEI `@xml:id`, slugified).
         name:
           type: string
+          description: Text name (URL slug, from the collection name).
         corpus:
           type: string
+          description: Name of the containing corpus.
         title:
           type: string
+          description: Main title from the TEI `titleStmt/title[1]`.
         authors:
           type: array
+          description: Author list from `ectei:get-authors`.
           items:
             $ref: '#/components/schemas/Author'
         ref:
           type: string
           format: url
-          description: Wikidata URI for text
-        # FIXME do we need a refs array?
-        # refs:
-        #   type: array
-        #   items:
-        #     $ref: '#/components/schemas/ExternalReferenceResourceId'
-        digitalSource:
-          $ref: '#/components/schemas/DigitalSource'
-        printedSource:
-          $ref: '#/components/schemas/PrintSource'
-        dates:
-          $ref: '#/components/schemas/Dates'
+          description: >-
+            Wikidata URI for the text itself, from
+            `titleStmt/title/@ref`. May contain multiple
+            space-separated tokens; see `refs`.
+        refs:
+          type: array
+          description: >-
+            Individual ref tokens parsed from `@ref`, filtered to
+            valid Wikidata-like identifiers.
+          items:
+            type: string
+        referenceYear:
+          type: integer
+          description: >-
+            Normalized year of reference (firstEdition date or
+            equivalent), from `ectei:get-reference-year`. Absent if
+            not encoded in the TEI.
+        sources:
+          type: array
+          description: >-
+            Bibliographic sources from `sourceDesc/bibl`.
+          items:
+            $ref: '#/components/schemas/Source'
         metrics:
           $ref: '#/components/schemas/TextMetrics'
+        commit:
+          type: string
+          description: >-
+            Git commit SHA of the corpus repo at the time of
+            ingestion, from the per-corpus `git.xml`.
         corpusUrl:
           type: string
           format: url
+          description: API URL of the containing corpus.
         entitiesUrl:
           type: string
           format: url
+          description: API URL of the text's entities listing.
       required:
         - id
         - name
-        - title
         - corpus
+        - title
+        - authors
+        - sources
         - metrics
         - corpusUrl
         - entitiesUrl
