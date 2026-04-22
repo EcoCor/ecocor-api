@@ -707,14 +707,18 @@ function api:text-entities-csv($corpusname, $textname, $type) {
 declare
   %rest:GET
   %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/tei")
-  %rest:produces("application/xml")
-  %output:media-type("application/xml")
   %output:method("xml")
 function api:text-tei($corpusname, $textname) {
   let $doc := ecutil:get-doc($corpusname, $textname)
   return
-    if (count($doc)) then
+    if (count($doc)) then (
+      <rest:response>
+        <http:response status="200">
+          <http:header name="Content-Type" value="application/tei+xml"/>
+        </http:response>
+      </rest:response>,
       $doc/tei:TEI
+    )
     else
       <rest:response>
         <http:response status="404"/>
