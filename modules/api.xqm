@@ -623,24 +623,28 @@ declare
   %rest:DELETE
   %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}")
   %rest:header-param("Authorization", "{$auth}")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
   %output:method("json")
-function api:text-delete($corpusname, $textname, $data, $auth) {
+function api:text-delete($corpusname, $textname, $auth) {
   if (not($auth)) then
-    <rest:response>
-      <http:response status="401"/>
-    </rest:response>
+    (
+      <rest:response><http:response status="401"/></rest:response>,
+      map { "message": "authorization required" }
+    )
   else
-
-  let $paths := ecutil:filepaths($corpusname, $textname)
-
-  return
-    if (not(doc($paths?files?tei))) then
-      <rest:response>
-        <http:response status="404"/>
-      </rest:response>
-    else
-      ecutil:remove-corpus-sha($corpusname),
-      xmldb:remove($paths?collections?text)
+    let $paths := ecutil:filepaths($corpusname, $textname)
+    return
+      if (not(doc-available($paths?files?tei))) then
+        (
+          <rest:response><http:response status="404"/></rest:response>,
+          map { "message": "text not found" }
+        )
+      else (
+        ecutil:remove-corpus-sha($corpusname),
+        xmldb:remove($paths?collections?text),
+        map { "message": "text deleted" }
+      )
 };
 
 (:~
