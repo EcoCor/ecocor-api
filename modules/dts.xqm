@@ -594,6 +594,26 @@ declare function ecdts:descendants-of(
 };
 
 (:~
+ : All citable elements in the resource, in document order. Used as a
+ : linear index for range (start/end) computations.
+ :)
+declare function ecdts:all-citable-elements(
+  $tei as element(tei:TEI)
+) as element()* {
+  ecdts:walk-citable-elements(ecdts:top-level-units($tei))
+};
+
+declare function ecdts:walk-citable-elements(
+  $nodes as element()*
+) as element()* {
+  for $node in $nodes
+  return (
+    $node,
+    ecdts:walk-citable-elements(ecdts:citable-children($node))
+  )
+};
+
+(:~
  : Siblings of an element (including itself) in document order.
  :)
 declare function ecdts:siblings(
@@ -856,13 +876,78 @@ declare function ecdts:navigate(
             }
           ))
 
-    (: start/end + down combinations not yet implemented :)
+    (: Case: start/end + down → range inclusive, with descendants to
+       the requested depth. Budget = max(level(start), level(end)) +
+       down; -1 means unlimited. :)
+    else if ($start and $end and exists($down)) then
+      let $start-elem := ecdts:resolve-ref($tei, $resource-id, $start)
+      let $end-elem := ecdts:resolve-ref($tei, $resource-id, $end)
+      return
+        if (empty($start-elem) or empty($end-elem)) then
+          (
+            <rest:response><http:response status="404"/></rest:response>,
+            map {
+              "error": "Not Found",
+              "message": "Could not resolve start or end ref."
+            }
+          )
+        else
+          let $all := ecdts:all-citable-elements($tei)
+          let $start-pos :=
+            (for $u at $i in $all where $u is $start-elem return $i)[1]
+          let $end-pos :=
+            (for $u at $i in $all where $u is $end-elem return $i)[1]
+          return
+            if (empty($start-pos) or empty($end-pos)) then
+              (
+                <rest:response><http:response status="404"/></rest:response>,
+                map {
+                  "error": "Not Found",
+                  "message": "Start or end ref is not a citable unit."
+                }
+              )
+            else if ($start-pos > $end-pos) then
+              (
+                <rest:response><http:response status="400"/></rest:response>,
+                map {
+                  "error": "Bad Request",
+                  "message":
+                    "'start' must precede 'end' in document order."
+                }
+              )
+            else
+              let $range :=
+                subsequence($all, $start-pos, $end-pos - $start-pos + 1)
+              let $budget :=
+                if ($down = -1) then -1
+                else max((
+                  ecdts:citable-level($start-elem),
+                  ecdts:citable-level($end-elem)
+                )) + $down
+              let $filtered :=
+                for $u in $range
+                where $budget = -1 or ecdts:citable-level($u) <= $budget
+                return $u
+              return map:merge((
+                $base,
+                map {
+                  "start": ecdts:citable-unit($start-elem, $resource-id),
+                  "end": ecdts:citable-unit($end-elem, $resource-id),
+                  "member": array {
+                    for $u in $filtered
+                    return ecdts:citable-unit($u, $resource-id)
+                  }
+                }
+              ))
+
+    (: Any other combination not covered above :)
     else
       (
         <rest:response><http:response status="501"/></rest:response>,
         map {
           "error": "Not Implemented",
-          "message": "The combination of 'start'/'end' with 'down' is not yet supported."
+          "message":
+            "This combination of Navigation parameters is not supported."
         }
       )
 };
@@ -1007,17 +1092,25 @@ function ecdts:document(
                   <description>Could not resolve start or end ref.</description>
                 </error>
               )
-              else if (not($start-elem/.. is $end-elem/..)) then (
-                <rest:response><http:response status="501"/></rest:response>,
-                <error statusCode="501" xmlns="https://dtsapi.org/v1.0#">
-                  <title>Not Implemented</title>
-                  <description>Ranges spanning different parents are not yet supported.</description>
-                </error>
-              )
               else
-                let $siblings := $start-elem/../*
-                let $start-pos := count($start-elem/preceding-sibling::*) + 1
-                let $end-pos := count($end-elem/preceding-sibling::*) + 1
+                (: Find the deepest common ancestor of start and end,
+                   then take its direct-child "branches" from the one
+                   containing start through the one containing end
+                   (inclusive). Same-parent ranges are the special case
+                   where both elements are direct children of the CA. :)
+                let $common :=
+                  ($start-elem/ancestor::* intersect $end-elem/ancestor::*)[last()]
+                let $start-branch :=
+                  if ($start-elem/.. is $common) then $start-elem
+                  else
+                    ($start-elem/ancestor::*[parent::* is $common])[1]
+                let $end-branch :=
+                  if ($end-elem/.. is $common) then $end-elem
+                  else
+                    ($end-elem/ancestor::*[parent::* is $common])[1]
+                let $siblings := $common/*
+                let $start-pos := count($start-branch/preceding-sibling::*) + 1
+                let $end-pos := count($end-branch/preceding-sibling::*) + 1
                 let $range := $siblings[
                   position() >= $start-pos and position() <= $end-pos
                 ]
