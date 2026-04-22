@@ -58,8 +58,6 @@ ENV ECOCOR_API_BASE=${ECOCOR_API_BASE:-http://localhost:8080/exist/restxq}
 ENV EXTRACTOR_SERVER=${EXTRACTOR_SERVER:-http://localhost:8040}
 ENV GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-""}
 
-RUN useradd ecocor
-
 WORKDIR ${EXIST_HOME}
 
 # adding expath packages to the autodeploy directory
@@ -98,13 +96,20 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     # remove portal webapp
     && rm -Rf ${EXIST_HOME}/etc/jetty/webapps/portal \
-    # set permissions for the ecocor user
-    && chown -R ecocor:ecocor ${EXIST_HOME} \
+    # make EXIST_HOME group-owned by GID 0 and group-writable so the
+    # arbitrary (non-root, non-ecocor) UID assigned by OpenShift can
+    # still read/write it — every runtime UID is in the root group (GID 0)
+    && chgrp -R 0 ${EXIST_HOME} \
+    && chmod -R g=u ${EXIST_HOME} \
     && chmod 755 ${EXIST_HOME}/entrypoint.sh \
     # remove JndiLookup class due to Log4Shell CVE-2021-44228 vulnerability
     && find ${EXIST_HOME} -name log4j-core-*.jar -exec zip -q -d {} org/apache/logging/log4j/core/lookup/JndiLookup.class \;
 
-USER ecocor:ecocor
+# Numeric USER so OpenShift's arbitrary-UID policy honours it.
+# The specific UID doesn't matter — OKD/OpenShift overrides it at
+# runtime. What matters is that GID 0 (which every runtime UID is
+# in) can read/write EXIST_HOME, which the chgrp/chmod above ensures.
+USER 1001
 
 VOLUME ["${EXIST_DATA_DIR}"]
 

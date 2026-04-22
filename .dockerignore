@@ -4,3 +4,17 @@ build/
 expath-pkg.xml
 *.xar
 local.build.properties
+
+# dev-only stuff that shouldn't enter the build context
+# (keep .git/ — the ant build reads it via `git describe` to set
+# package.version; without it the xar filename becomes
+# "ecocor-${package.version}.xar" literal and autodeploy fails)
+.venv/
+.venv-dts/
+.hypothesis/
+.pytest_cache/
+__pycache__/
+*.log
+dts-report.html
+*-report.html
+notes/
