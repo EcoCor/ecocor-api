@@ -69,6 +69,21 @@ as item()? {
     sm:chmod(xs:anyURI($config:secrets-file), 'rw-------')
 };
 
+(: xqsuite unit-test collections, created here (post-install) rather
+ : than in pre-install.xq because $target only exists after the xar
+ : has been unpacked. VS Code's eXist-db sync can only PUT files into
+ : existing collections; these two lines ensure the target dirs are
+ : present on a fresh install so the first sync doesn't fail. :)
+declare function local:ensure-unit-test-collections () as empty-sequence() {
+  let $unit-tests := $target || "/unit-tests"
+  let $_ := if (xmldb:collection-available($unit-tests)) then ()
+    else xmldb:create-collection($target, "unit-tests")
+  let $fixtures := $unit-tests || "/fixtures"
+  let $_ := if (xmldb:collection-available($fixtures)) then ()
+    else xmldb:create-collection($unit-tests, "fixtures")
+  return ()
+};
+
 (: elevate privileges for github webhook :)
 (: let $webhook := xs:anyURI($target || '/modules/webhook.xqm') :)
 
@@ -78,6 +93,7 @@ let $restxq-module := xs:anyURI('modules/api.xpm')
 return (
   local:create-config-file(),
   local:create-secrets-file(),
+  local:ensure-unit-test-collections(),
   (: sm:chown($webhook, "admin"),
   sm:chgrp($webhook, "dba"),
   sm:chmod($webhook, 'rwsr-xr-x'), :)

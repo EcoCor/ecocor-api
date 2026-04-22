@@ -39,9 +39,4 @@ xdb:create-collection("/", $config:webhook-root),
 local:mkcol("/db/system/config", $config:corpora-root),
 xdb:store-files-from-pattern(
   concat("/db/system/config", $config:corpora-root), $dir, "data.xconf"
-),
-(: Ensure xqsuite unit-tests collection exists under the app root so
- : VS Code's eXist-db sync can push *.xqm files into it without a
- : "collection not found" race on fresh setups. :)
-xdb:create-collection($target, "unit-tests"),
-xdb:create-collection(concat($target, "/unit-tests"), "fixtures")
+)
