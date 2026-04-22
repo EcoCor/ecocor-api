@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Fixture exercising every branch of ectei:get-year:
+    1. date with @when   → first 4 chars of @when
+    2. text matches \d{4}         → that text
+    3. text matches \d{4}-\d{4}   → that text (range)
+    4. fallback via analyze-string → first 4-digit match in text
+  The outer <bibl type="priority-chain"> section provides three
+  dates in descending priority so the reference-year chain can
+  be tested; the top-level <dates> wrapper is non-TEI and exists
+  only so the year-variant <date> elements have a container we
+  can XPath into from the test module.
+-->
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xml:id="fixture_years_tokenized" type="tokenized">
+  <teiHeader>
+    <fileDesc>
+      <titleStmt>
+        <title>Year variants</title>
+      </titleStmt>
+      <publicationStmt>
+        <publisher>Test</publisher>
+        <idno type="URI">fixture_years</idno>
+      </publicationStmt>
+      <sourceDesc>
+        <!-- Priority chain: firstEdition wins over printSource over digitalSource. -->
+        <bibl type="firstEdition">
+          <title>First edition</title>
+          <date when="1795-04-01">1795</date>
+        </bibl>
+        <bibl type="printSource">
+          <title>Print source</title>
+          <date>1900</date>
+        </bibl>
+        <bibl type="digitalSource">
+          <title>Digital source</title>
+          <date>2020</date>
+        </bibl>
+        <!-- Year variants — each labelled so the test module can pick
+             one by xml:id and assert the expected get-year output. -->
+        <bibl type="variants">
+          <date xml:id="y-when" when="1810-04-01">ignored text content</date>
+          <date xml:id="y-plain">1810</date>
+          <date xml:id="y-range">1795-1796</date>
+          <date xml:id="y-embedded">published around 1732 in Leipzig</date>
+        </bibl>
+      </sourceDesc>
+    </fileDesc>
+  </teiHeader>
+  <text>
+    <body>
+      <p xml:id="p1">placeholder body.</p>
+    </body>
+  </text>
+</TEI>

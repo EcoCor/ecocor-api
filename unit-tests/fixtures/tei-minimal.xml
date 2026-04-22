@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A minimal TEI fixture with unambiguous values for every
+  ectei:get-* extractor we test. Used as the baseline "things
+  work as expected" case.
+
+  Deliberately includes:
+  - a trailing parenthesized date on one author name (to test stripping)
+  - a separate illustrator (to test role filtering)
+  - three bibl entries (firstEdition, printSource, digitalSource)
+    so priority chains can be exercised
+  - paragraphs both with and without @xml:id
+-->
+<TEI xmlns="http://www.tei-c.org/ns/1.0" xml:id="fixture_minimal_tokenized" type="tokenized">
+  <teiHeader>
+    <fileDesc>
+      <titleStmt>
+        <title>Unit Test Main Title</title>
+        <title type="sub">A Subtitle for Testing</title>
+        <author ref="https://www.wikidata.org/entity/Q1">
+          Goethe, Johann Wolfgang von (1749-1832)
+        </author>
+        <author>
+          Doe, Jane
+        </author>
+        <author role="illustrator">
+          Picasso, Pablo
+        </author>
+      </titleStmt>
+      <publicationStmt>
+        <publisher>Test Publisher</publisher>
+        <idno type="URI">fixture_minimal</idno>
+      </publicationStmt>
+      <sourceDesc>
+        <!-- A bibl title that MUST NOT be picked up by get-titles. -->
+        <bibl type="firstEdition">
+          <title>Trap Title — first edition bibl</title>
+          <date when="1800-01-01">1800</date>
+          <pubPlace>Weimar</pubPlace>
+        </bibl>
+        <bibl type="printSource">
+          <title>Print Source Title</title>
+          <date>1900</date>
+          <publisher>Late Publisher</publisher>
+        </bibl>
+        <bibl type="digitalSource">
+          <title>Digital Source Title</title>
+          <date>2020</date>
+          <ref target="https://example.org/source"/>
+        </bibl>
+      </sourceDesc>
+    </fileDesc>
+  </teiHeader>
+  <text>
+    <body>
+      <p xml:id="p1">First paragraph with id.</p>
+      <p xml:id="p2">Second paragraph with id.</p>
+      <!-- This paragraph has no xml:id and should be excluded. -->
+      <p>Paragraph without id — must be skipped by get-text-paras.</p>
+    </body>
+  </text>
+</TEI>
