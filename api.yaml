@@ -1445,28 +1445,48 @@ components:
           description: The normalized text of the `<bibl>` element.
         title:
           type: string
+          description: >-
+            Title of the source, from the first `<title>` child of
+            the bibl.
         author:
           type: string
+          description: >-
+            Author name, from the first `<author>` child of the bibl.
         publisher:
           type: string
+          description: >-
+            Publisher name, from the first `<publisher>` child.
         placePublished:
           type: string
+          description: >-
+            Publication place, from the first `<pubPlace>` child.
         year:
           type: string
+          nullable: true
           description: >-
             Publication year as a string — may be a range
-            (e.g. "1795/1796") so declared as `string`.
+            (e.g. "1795/1796") so declared as `string`. Can be
+            `null` for bibl entries without a parseable date.
         links:
           type: array
-          description: External links (`<ref>` children of the bibl).
+          description: >-
+            External links, built from `<ref>` children of the bibl.
+            `target` URLs are used as-is; `textgrid:` URIs are
+            rewritten to `textgridrep.org`.
           items:
             type: object
             properties:
               url:
                 type: string
                 format: url
+                description: >-
+                  Target URL — from `ref/@target`, or `ref`'s text
+                  content if it looks like a URL.
               text:
                 type: string
+                description: >-
+                  Optional label text from the `<ref>` element's
+                  content.
       required:
         - bibl
     TextMetrics:
@@ -1567,11 +1587,12 @@ components:
           items:
             type: string
         referenceYear:
-          type: integer
+          type: string
           description: >-
             Normalized year of reference (firstEdition date or
-            equivalent), from `ectei:get-reference-year`. Absent if
-            not encoded in the TEI.
+            equivalent), from `ectei:get-reference-year`. Returned as
+            a string because the TEI may encode ranges
+            (e.g. `"1795/1796"`). Absent if not encoded in the TEI.
         sources:
           type: array
           description: >-
@@ -1605,51 +1626,83 @@ components:
         - entitiesUrl
     Occurrence:
       type: object
+      title: Entity occurrence
+      description: >-
+        One occurrence of an entity within a specific paragraph. The
+        `id` is the paragraph's `xml:id`; `frequency` is the number of
+        mentions of this entity in that paragraph.
+      x-ecocor-api-function: "entities:corpus"
       properties:
+        id:
+          type: string
+          description: Paragraph `xml:id` where the entity occurs.
         frequency:
           type: integer
-        id:
-          type: string
-        # FIXME: Including the text paragraphs will not perform on the corpus
-        # level which is why the property is optional for now. We should
-        # consider removing it and finding an alternative why to access the
-        # text. How about providing a link to the TEI with the paragraph ID as
-        # fragment identifier.
-        text:
-          type: string
+          description: >-
+            Count of mentions of the entity in this paragraph.
       required:
-        - frequency
         - id
+        - frequency
     EntityMetrics:
       type: object
+      title: Entity metrics
+      description: >-
+        Aggregate occurrence data for one entity. Embedded in `Entity`
+        via `metrics`. Produced as part of the entity list response.
+      x-ecocor-api-function: "entities:corpus"
       properties:
-        scope:
-          type: string
-        occurrences:
-          type: array
-          items:
-            $ref: '#/components/schemas/Occurrence'
         overallFrequency:
           type: integer
+          description: Total mentions across all occurrences.
+        occurrences:
+          type: array
+          description: Paragraph-level occurrences.
+          items:
+            $ref: '#/components/schemas/Occurrence'
       required:
-        - occurrences
         - overallFrequency
+        - occurrences
     Entity:
       type: object
+      title: Entity
+      description: >-
+        A distinct entity identified by its Wikidata Q-number and
+        aggregated mention data. Produced by both `entities:corpus`
+        (whole corpus) and `entities:text` (per text).
+      x-ecocor-api-function: "entities:corpus"
       properties:
-        name:
-          type: string
         id:
           type: string
+          description: Wikidata Q-identifier (e.g. `Q25234`).
+        name:
+          type: string
+          description: Display name from the first entity record.
         type:
           type: string
+          description: >-
+            Entity category (e.g. `Animal`, `Plant`). Comes from the
+            `<category>` element of the entity record.
         metrics:
           $ref: '#/components/schemas/EntityMetrics'
         uri:
           type: string
           format: url
+          description: >-
+            Canonical URL for this entity on the EcoCor API, if
+            emitted by the handler.
+      required:
+        - id
+        - name
+        - type
+        - metrics
     AnnotationLayer:
       type: object
+      title: Annotation layer (summary)
+      description: >-
+        Summary view of one stand-off annotation layer. Returned in
+        the list response `/corpora/{c}/texts/{t}/annotations`. Does
+        not include the annotations themselves; see `AnnotationLayerFull`.
+      x-ecocor-api-function: "api:text-annotations"
       properties:
         name:
           type: string
@@ -1675,21 +1728,36 @@ components:
         uri:
           type: string
           format: url
+          description: Canonical API URL of this layer.
         title:
           type: string
+          description: >-
+            Layer title from `teiHeader/titleStmt/title[1]`. Omitted
+            if the layer's header has none.
         licence:
           type: string
           format: url
+          description: >-
+            Licence URL from `teiHeader/availability/licence/@target`.
+            Omitted if the layer declares no licence.
         source:
           type: string
-          description: Filename of the base TEI this layer annotates
+          description: >-
+            Target URL from `sourceDesc/bibl/ref[@type="source"]/@target`
+            — typically the base TEI this layer annotates. Omitted if
+            the layer declares no explicit source.
         application:
           type: object
+          description: >-
+            Tooling used to produce the layer, from the layer header's
+            `appInfo/application`. Omitted if not declared.
           properties:
             ident:
               type: string
+              description: Application identifier (`@ident`).
             version:
               type: string
+              description: Application version (`@version`).
       required:
         - name
         - type
@@ -1697,6 +1765,13 @@ components:
         - categoryCounts
         - uri
     AnnotationLayerFull:
+      title: Annotation layer (full)
+      description: >-
+        Full view of one annotation layer, including its taxonomy and
+        all annotations. Returned by
+        `/corpora/{c}/texts/{t}/annotations/{layername}` when
+        `format=json` (the default). Extends `AnnotationLayer`.
+      x-ecocor-api-function: "api:text-annotation-layer"
       allOf:
         - $ref: '#/components/schemas/AnnotationLayer'
         - type: object
@@ -1709,23 +1784,45 @@ components:
               properties:
                 id:
                   type: string
+                  description: >-
+                    The taxonomy element's `xml:id`
+                    (from `classDecl/taxonomy/@xml:id`).
                 categories:
                   type: array
+                  description: >-
+                    One entry per `<category>` in the taxonomy.
                   items:
                     type: object
                     properties:
                       id:
                         type: string
+                        description: >-
+                          Category id (`category/@xml:id`); matches
+                          the values that appear (stripped of `#`) in
+                          annotation `@ana` attributes.
                       description:
                         type: string
+                        description: >-
+                          Normalized text of the category's
+                          `<catDesc>`.
             annotations:
               type: array
+              description: >-
+                All annotation elements in the layer, filtered by the
+                request's `category` parameter if supplied.
               items:
                 $ref: '#/components/schemas/Annotation'
           required:
             - annotations
     Annotation:
       type: object
+      title: Annotation
+      description: >-
+        One annotation element — a target (the annotated token[s] with
+        resolved surface text) and a body (key-value pairs extracted
+        from TEI attributes and `note` children). Embedded in
+        `AnnotationLayerFull.annotations`.
+      x-ecocor-api-function: "api:text-annotation-layer"
       properties:
         target:
           type: object
@@ -1760,8 +1857,15 @@ components:
             properties:
               key:
                 type: string
+                description: >-
+                  For attributes: the local-name of the attribute
+                  (`ana`, `corresp`). For notes: the `@type` of the
+                  `<note>` element.
               value:
                 type: string
+                description: >-
+                  For attributes: the attribute's string value. For
+                  notes: the normalized text content of the `<note>`.
             required:
               - key
               - value
@@ -1770,6 +1874,12 @@ components:
         - body
     Token:
       type: object
+      title: Token
+      description: >-
+        One token from the tokenized TEI — a `<w>` (word) or `<pc>`
+        (punctuation) element. Returned by
+        `/corpora/{c}/texts/{t}/tokens`.
+      x-ecocor-api-function: "api:text-tokens"
       properties:
         id:
           type: string
@@ -1789,6 +1899,11 @@ components:
         - text
         - type
     TokenWithAnnotations:
+      title: Token with aggregated annotations
+      description: >-
+        A single token plus every annotation targeting it across all
+        layers. Returned by `/corpora/{c}/texts/{t}/tokens/{tokenid}`.
+      x-ecocor-api-function: "api:text-token"
       allOf:
         - $ref: '#/components/schemas/Token'
         - type: object
@@ -1804,15 +1919,27 @@ components:
                 properties:
                   layer:
                     type: string
+                    description: >-
+                      Layer name (filename without `.xml`) that
+                      produced this annotation.
                   body:
                     type: array
+                    description: >-
+                      Flat list of key-value pairs for this
+                      annotation.
                     items:
                       type: object
                       properties:
                         key:
                           type: string
+                          description: >-
+                            Attribute name or note `@type` — same
+                            derivation as `Annotation.body[].key`.
                         value:
                           type: string
+                          description: >-
+                            Attribute value or normalized note text —
+                            same derivation as `Annotation.body[].value`.
                       required:
                         - key
                         - value
@@ -1821,17 +1948,30 @@ components:
                   - body
     SearchResults:
       type: object
+      title: Full-text search results
+      description: >-
+        Paginated response of `/search`. Wraps a page of paragraph-level
+        hits plus pagination metadata.
+      x-ecocor-api-function: "search:search"
       properties:
         query:
           type: string
+          description: The Lucene query that was executed (echo of `q`).
         totalHits:
           type: integer
+          description: Total matching paragraphs across the scope.
         offset:
           type: integer
+          description: >-
+            Zero-based offset of the first hit in this page, echoed
+            from the request's `offset` query parameter (default 0).
         limit:
           type: integer
+          description: >-
+            Number of hits per page, echoed from `limit` (default 20).
         results:
           type: array
+          description: Current page of hits.
           items:
             $ref: '#/components/schemas/SearchHit'
       required:
@@ -1842,6 +1982,12 @@ components:
         - results
     SearchHit:
       type: object
+      title: Full-text search hit
+      description: >-
+        One paragraph-level hit for `/search`. Includes resource/corpus
+        metadata, a KWIC snippet, and DTS Collection/Navigation/Document
+        URLs to the matching paragraph.
+      x-ecocor-api-function: "search:search"
       properties:
         id:
           type: string
@@ -1851,15 +1997,23 @@ components:
           description: Text slug (e.g. 1807_kleist_erdbeben)
         corpus:
           type: string
+          description: Name of the containing corpus.
         title:
           type: string
+          description: >-
+            Main title of the text, from `ectei:get-titles(...)?main`.
         authors:
           type: array
+          description: Authors of the text, `name` only (no `ref`).
           items:
             type: object
             properties:
               name:
                 type: string
+                description: >-
+                  Author display name (no Wikidata ref; use the
+                  `/corpora/{c}/texts/{t}` endpoint for full author
+                  metadata).
         citableUnit:
           type: string
           description: >-
@@ -1890,18 +2044,30 @@ components:
         - document
     MetadataSearchResults:
       type: object
+      title: Metadata search results
+      description: >-
+        Paginated response of `/search/metadata`. Hits are texts (not
+        paragraphs) matched by author and/or title substrings.
+      x-ecocor-api-function: "search:metadata"
       properties:
         query:
           type: object
           description: Echo of the filters that were applied
         totalHits:
           type: integer
+          description: Total matching texts across the scope.
         offset:
           type: integer
+          description: >-
+            Zero-based offset of the first hit (echoed from `offset`,
+            default 0).
         limit:
           type: integer
+          description: >-
+            Results per page (echoed from `limit`, default 50).
         results:
           type: array
+          description: Current page of hits.
           items:
             $ref: '#/components/schemas/MetadataHit'
       required:
@@ -1912,26 +2078,39 @@ components:
         - results
     MetadataHit:
       type: object
+      title: Metadata search hit
+      description: >-
+        One text-level hit for `/search/metadata`.
+      x-ecocor-api-function: "search:metadata"
       properties:
         id:
           type: string
           description: Resource id (DTS public form)
         name:
           type: string
+          description: Text slug (collection name, e.g. `1807_kleist_erdbeben`).
         corpus:
           type: string
+          description: Name of the containing corpus.
         title:
           type: string
+          description: >-
+            Main title of the text, from `ectei:get-titles(...)?main`.
         authors:
           type: array
+          description: Authors of the text, `name` only.
           items:
             type: object
             properties:
               name:
                 type: string
+                description: Author display name.
         uri:
           type: string
           format: url
+          description: >-
+            Canonical API URL for this text, from
+            `ecutil:filepaths(base-uri($tei))?uri`.
         collection:
           type: string
           format: url
@@ -1943,18 +2122,32 @@ components:
         - title
     TokenSearchResults:
       type: object
+      title: Token search results
+      description: >-
+        Paginated response of `/search/tokens`. Hits are `<w>` tokens
+        matched by Lucene query, optionally filtered by layer type.
+      x-ecocor-api-function: "search:tokens"
       properties:
         query:
           type: object
           description: Echo of the parameters that were applied
         totalHits:
           type: integer
+          description: >-
+            Total matching tokens (after the optional `layerType`
+            filter).
         offset:
           type: integer
+          description: >-
+            Zero-based offset of the first hit (echoed from `offset`,
+            default 0).
         limit:
           type: integer
+          description: >-
+            Results per page (echoed from `limit`, default 20).
         results:
           type: array
+          description: Current page of hits.
           items:
             $ref: '#/components/schemas/TokenSearchHit'
       required:
@@ -1965,25 +2158,36 @@ components:
         - results
     TokenSearchHit:
       type: object
+      title: Token search hit
+      description: >-
+        One token-level hit for `/search/tokens`. Carries the token
+        itself plus all annotations targeting it across every layer,
+        and a DTS Document URL for the containing paragraph.
+      x-ecocor-api-function: "search:tokens"
       properties:
         id:
           type: string
           description: Resource id (DTS public form)
         name:
           type: string
+          description: Text slug (collection name).
         corpus:
           type: string
+          description: Name of the containing corpus.
         token:
           type: object
+          description: The matching token, mirrored from `Token`.
           properties:
             id:
               type: string
+              description: Token xml:id.
             text:
               type: string
               description: Surface form
             type:
               type: string
               enum: [w, pc]
+              description: Element type (`w` or `pc`).
           required:
             - id
             - text
@@ -2015,13 +2219,22 @@ components:
                   `layerType=entities`).
               body:
                 type: array
+                description: >-
+                  Key-value pairs — same derivation as
+                  `Annotation.body`.
                 items:
                   type: object
                   properties:
                     key:
                       type: string
+                      description: >-
+                        Attribute name or note `@type` — same
+                        derivation as `Annotation.body[].key`.
                     value:
                       type: string
+                      description: >-
+                        Attribute value or normalized note text —
+                        same derivation as `Annotation.body[].value`.
                   required:
                     - key
                     - value
@@ -2047,22 +2260,33 @@ components:
         - annotations
     DtsEntryPoint:
       type: object
+      title: DTS Entry Point
       description: >-
         JSON-LD Entry Point document as defined by the DTS v1.0
-        specification.
+        specification. Advertises URI templates for the Collection,
+        Navigation, and Document endpoints.
+      x-ecocor-api-function: "ecdts:entry-point"
       properties:
         '@context':
           type: string
           format: url
+          description: >-
+            JSON-LD context URL (`$ecdts:jsonld-context`), always
+            `https://dtsapi.org/context/v1.0.json`.
         '@id':
           type: string
           format: url
+          description: Canonical URL of this Entry Point.
         '@type':
           type: string
           enum: [EntryPoint]
+          description: Fixed string `EntryPoint`.
         dtsVersion:
           type: string
           example: "1.0"
+          description: >-
+            DTS spec version implemented — `"1.0"` (from
+            `$ecdts:spec-version`).
         collection:
           type: string
           description: URI template for the Collection endpoint
@@ -2082,29 +2306,57 @@ components:
         - document
     DtsCollection:
       type: object
+      title: DTS Collection
       description: >-
         JSON-LD Collection document as defined by the DTS v1.0
         specification. Represents either a collection (`@type:
-        Collection`) or a leaf `Resource`.
+        Collection`) or a leaf `Resource`. Dispatcher picks
+        `root-collection`, `corpus-collection`, or `resource`
+        depending on the `id` parameter.
+      x-ecocor-api-function: "ecdts:collection"
       properties:
         '@context':
           type: string
           format: url
+          description: >-
+            JSON-LD context URL
+            (`https://dtsapi.org/context/v1.0.json`).
         '@id':
           type: string
+          description: >-
+            Identifier — `"ecocor"` at root, the corpus name for a
+            corpus collection, the public Resource id for a single
+            text.
         '@type':
           type: string
           enum: [Collection, Resource]
+          description: >-
+            `Collection` for root/corpus views, `Resource` for a leaf
+            text.
         dtsVersion:
           type: string
+          description: DTS spec version (`"1.0"`).
         title:
           type: string
+          description: >-
+            Human-readable title. `"EcoCor"` at root, the corpus title
+            for a corpus, the author-prefixed text title for a
+            Resource.
         description:
           type: string
+          description: >-
+            Optional description text. For a corpus, carried from the
+            corpus's `projectDesc` (Markdown-rendered).
         totalParents:
           type: integer
+          description: >-
+            Number of parent collections. `0` at root, `1` for a
+            corpus or Resource.
         totalChildren:
           type: integer
+          description: >-
+            Number of direct children (sub-collections or Resources).
+            Leaf Resources have `0`.
         member:
           type: array
           description: Child collections or resources.
@@ -2120,20 +2372,30 @@ components:
         - dtsVersion
     DtsNavigation:
       type: object
+      title: DTS Navigation
       description: >-
         JSON-LD Navigation document as defined by the DTS v1.0
         specification. Describes the citation structure of a Resource.
+      x-ecocor-api-function: "ecdts:navigation"
       properties:
         '@context':
           type: string
           format: url
+          description: >-
+            JSON-LD context URL
+            (`https://dtsapi.org/context/v1.0.json`).
         '@id':
           type: string
+          description: >-
+            Request URL for this Navigation response (reconstructed
+            by `ecdts:navigation-request-id`).
         '@type':
           type: string
           enum: [Navigation]
+          description: Fixed string `Navigation`.
         dtsVersion:
           type: string
+          description: DTS spec version (`"1.0"`).
         resource:
           type: object
           description: The Resource this Navigation describes.
@@ -2148,20 +2410,29 @@ components:
         - dtsVersion
     EntityAggregate:
       type: object
+      title: Entity aggregate
       description: >-
         Entity aggregate for a corpus or single text. Entities are
-        grouped by lemma.
+        grouped by lemma. Single-text responses come straight from the
+        cached XML (`aggregate:xml-to-map`); corpus-wide responses
+        merge every cached text in the corpus
+        (`aggregate:merge-aggregates`).
+      x-ecocor-api-function: "aggregate:get-entities"
       properties:
         scope:
           type: object
+          description: >-
+            The scope this aggregate was computed over — always a
+            `corpus`, plus `id` when restricted to one text.
           properties:
             corpus:
               type: string
+              description: Corpus name the aggregate is scoped to.
             id:
               type: string
               description: >-
                 Present only when the aggregate is scoped to a single
-                text.
+                text (`@resource` of the cached XML).
           required:
             - corpus
         groupBy:
@@ -2184,10 +2455,16 @@ components:
           description: Number of distinct entity keys.
         offset:
           type: integer
+          description: >-
+            Zero-based offset of the first entity in this page (from
+            `offset`, default 0).
         limit:
           type: integer
+          description: >-
+            Entities per page (from `limit`, default 50).
         entities:
           type: array
+          description: Paged entity list.
           items:
             $ref: '#/components/schemas/AggregateEntity'
       required:
@@ -2200,6 +2477,12 @@ components:
         - entities
     AggregateEntity:
       type: object
+      title: Entity in aggregate
+      description: >-
+        One entity entry within an `EntityAggregate`. Carries
+        per-entity counts and identifiers aggregated across one or
+        more texts.
+      x-ecocor-api-function: "aggregate:xml-to-map"
       properties:
         key:
           type: string
@@ -2217,6 +2500,9 @@ components:
           description: Resource ids that contain the entity.
         surfaceForms:
           type: array
+          description: >-
+            Distinct surface forms seen for this entity (from the
+            cached `surfaceForms/form` elements).
           items:
             type: string
         categories:
@@ -2226,6 +2512,9 @@ components:
           description: Annotation `@ana` values without leading `#`.
         wikidataIds:
           type: array
+          description: >-
+            Wikidata Q-identifiers associated with this entity key
+            (from the cached `wikidataIds/id` elements).
           items:
             type: string
         layers:
@@ -2239,25 +2528,45 @@ components:
         - textCount
     AggregateComputeResult:
       type: object
+      title: Aggregate compute result (admin POST)
+      description: >-
+        Response body from `POST /aggregate/entities`. Summarizes
+        what was computed and where it was stored.
+      x-ecocor-api-function: "aggregate:post-entities"
       properties:
         message:
           type: string
+          description: Fixed string `"aggregate computed"`.
         computed:
           type: string
           format: date-time
+          description: >-
+            Timestamp when the computation ran
+            (`current-dateTime()`).
         textCount:
           type: integer
+          description: >-
+            Number of texts for which an aggregate was (re)computed
+            in this run.
         results:
           type: array
+          description: One entry per recomputed text.
           items:
             type: object
             properties:
               id:
                 type: string
+                description: Resource id of the recomputed text.
               distinctEntities:
                 type: integer
+                description: >-
+                  Number of distinct entity keys in the newly
+                  computed aggregate.
               totalMentions:
                 type: integer
+                description: >-
+                  Total mention count across all entities in the
+                  newly computed aggregate.
               stored:
                 type: string
                 description: Path of the stored aggregate XML.
