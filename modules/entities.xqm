@@ -145,31 +145,31 @@ declare function entities:corpus(
   $corpusname as xs:string,
   $type as xs:string*
 ) {
-  let $corpus := ectei:get-corpus-info-by-name($corpusname)
   let $col := collection($config:corpora-root || '/' || $corpusname)
-  let $ids := if ($type) then
-    distinct-values($col//entities/entity[category=$type]/wikidata)
-    else distinct-values($col//entities/entity/wikidata)
+  let $all := if ($type) then
+    $col/entities/entity[category = $type]
+  else
+    $col/entities/entity
   return array {
-    for $id in $ids
-    let $entities := $col//entities/entity[wikidata=$id]
-    return
-      map {
-        "id": $id,
-        "name": $entities[1]/name[1]/text(),
-        "type": $entities[1]/category/text(),
-        "metrics": map {
-          "overallFrequency": sum($entities/segments/segment/count),
-          "occurrences": array {
-            for $seg in $entities/segments/segment
-            let $f := $seg/count/text()
-            return map {
-              "id": $seg/id/text(),
-              "frequency": if (number($f)) then xs:integer($f) else ()
-            }
+    for $entity in $all
+    let $id := $entity/wikidata/text()
+    group by $id
+    return map {
+      "id": $id,
+      "name": $entity[1]/name[1]/text(),
+      "type": $entity[1]/category/text(),
+      "metrics": map {
+        "overallFrequency": sum($entity/segments/segment/count),
+        "occurrences": array {
+          for $seg in $entity/segments/segment
+          let $f := $seg/count/text()
+          return map {
+            "id": $seg/id/text(),
+            "frequency": if (number($f)) then xs:integer($f) else ()
           }
         }
       }
+    }
   }
 };
 
