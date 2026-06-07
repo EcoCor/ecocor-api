@@ -44,9 +44,9 @@ paths:
                 $ref: '#/components/schemas/Info'
               example:
                 {
+                  "base": "https://ecocor.org/api",
                   "existdb": "6.0.1",
                   "name": "EcoCor",
-                  "status": "beta",
                   "version": "1.0.0"
                 }
 
@@ -458,11 +458,11 @@ components:
     Info:
       type: object
       properties:
-        version:
-          type: string
         name:
           type: string
-        status:
+        base:
+          type: string
+        version:
           type: string
         existdb:
           type: string
