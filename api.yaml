@@ -202,6 +202,37 @@ paths:
                 }
         '404':
           description: Corpus not found
+    put:
+      summary: Update corpus metadata
+      description: >-
+        This endpoint requires authorization.
+
+        Replaces the corpus.xml file with the supplied teiCorpus document. The
+        corpus name encoded in the document must match the path parameter.
+      operationId: put-corpus
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Returns updated corpus metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Corpus'
+        '400':
+          description: Invalid document or corpus name mismatch
+        '401':
+          description: Authorization required
+        '404':
+          description: Corpus not found
+
     post:
       summary: Load corpus data from its repository
       description: >-
@@ -277,9 +308,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Text'
-            application/tei+xml:
+        '404':
+          description: Text not found
+
+    put:
+      summary: Add or replace a TEI document
+      description: >-
+        This endpoint requires authorization.
+
+        Stores the request body as the TEI document for this text. If the text
+        does not yet exist it is created. The `textname` for a new text must
+        consist of lower-case ASCII letters, digits and dashes only.
+      operationId: put-text
+      tags: [admin]
+      parameters:
+        - $ref: "#/components/parameters/corpusname"
+        - $ref: "#/components/parameters/textname"
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Returns the stored TEI document
+          content:
+            application/xml:
               schema:
                 type: string
+        '400':
+          description: Invalid TEI document or unacceptable text name
+        '401':
+          description: Authorization required
+        '404':
+          description: Corpus not found
 
     delete:
       summary: Remove a single text from the corpus
@@ -481,6 +544,10 @@ components:
           type: integer
         numOfEntityTypes:
           type: integer
+        numOfAnimals:
+          type: integer
+        numOfPlants:
+          type: integer
         biodiversityIndex:
           type: number
     Corpus:
@@ -504,6 +571,11 @@ components:
           format: url
         metrics:
           $ref: '#/components/schemas/CorpusMetrics'
+        commit:
+          type: string
+          description: >-
+            Git commit SHA of the source repository. Present only when all
+            texts in the corpus share the same commit hash.
         textsUrl:
           type: string
           format: url
@@ -519,6 +591,42 @@ components:
         - textsUrl
         - entitiesUrl
         - updated
+    SourceLink:
+      type: object
+      properties:
+        url:
+          type: string
+          format: url
+        text:
+          type: string
+      required:
+        - url
+    Source:
+      type: object
+      description: A bibliographic source entry derived from a TEI bibl element.
+      properties:
+        bibl:
+          type: string
+          description: Full normalized text content of the bibl element
+        type:
+          type: string
+          description: Value of the bibl/@type attribute (e.g. firstEdition, printSource, digitalSource)
+        title:
+          type: string
+        author:
+          type: string
+        publisher:
+          type: string
+        year:
+          type: string
+        placePublished:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceLink'
+      required:
+        - bibl
     ExternalReferenceResourceId:
       type: object
       properties:
@@ -539,6 +647,10 @@ components:
           type: integer
         numOfEntityTypes:
           type: integer
+        numOfAnimals:
+          type: integer
+        numOfPlants:
+          type: integer
         biodiversityIndex:
           type: number
     Author:
@@ -550,43 +662,8 @@ components:
           type: string
           format: url
           description: Wikidata URI
-        gender:
-          type: string
       required:
         - name
-    DigitalSource:
-      type: object
-      properties:
-        url:
-          type: string
-          format: url
-        name:
-          type: string
-      required:
-        - url
-    PrintSource:
-      type: object
-      properties:
-        publisher:
-          type: string
-        placePublished:
-          type: string
-        yearPublished:
-          type: integer
-        title:
-          type: string
-    Dates:
-      type: object
-      properties:
-        yearWritten:
-          type: string
-          nullable: true
-        yearPrinted:
-          type: string
-          nullable: true
-        yearNormalized:
-          type: integer
-          nullable: true
     Text:
       type: object
       properties:
@@ -605,18 +682,25 @@ components:
         ref:
           type: string
           format: url
-          description: Wikidata URI for text
-        # FIXME do we need a refs array?
-        # refs:
-        #   type: array
-        #   items:
-        #     $ref: '#/components/schemas/ExternalReferenceResourceId'
-        digitalSource:
-          $ref: '#/components/schemas/DigitalSource'
-        printedSource:
-          $ref: '#/components/schemas/PrintSource'
-        dates:
-          $ref: '#/components/schemas/Dates'
+          description: Wikidata URI for the text
+        refs:
+          type: array
+          items:
+            type: string
+          description: Array of external reference identifiers (e.g. wikidata:Q12345)
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/Source'
+          description: Bibliographic sources derived from TEI sourceDesc
+        commit:
+          type: string
+          description: Git commit SHA of the source repository at time of ingest
+        referenceYear:
+          type: string
+          description: >-
+            Reference year for the text. Derived from firstEdition date,
+            falling back to printSource then digitalSource.
         metrics:
           $ref: '#/components/schemas/TextMetrics'
         corpusUrl:
@@ -630,7 +714,7 @@ components:
         - name
         - title
         - corpus
-        - matrics
+        - metrics
         - corpusUrl
         - entitiesUrl
     Occurrence:
@@ -642,7 +726,7 @@ components:
           type: string
         # FIXME: Including the text paragraphs will not perform on the corpus
         # level which is why the property is optional for now. We should
-        # consider removing it and finding an alternative why to access the
+        # consider removing it and finding an alternative way to access the
         # text. How about providing a link to the TEI with the paragraph ID as
         # fragment identifier.
         text:
