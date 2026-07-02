@@ -1,4 +1,5 @@
 build/
+.claude/
 .ant-targets-build.xml
 .existdb.json
 expath-pkg.xml
