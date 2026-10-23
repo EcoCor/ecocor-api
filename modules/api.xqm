@@ -740,3 +740,354 @@ function api:text-plain($corpusname, $textname) {
         <http:response status="404"/>
       </rest:response>
 };
+
+(:~
+ : List stand-off annotation layers for a text
+ :
+ : Returns an array of layer metadata objects. The layer name comes from
+ : the filename in the text's annotations/ subcollection (not from
+ : listAnnotation/@type, which is exposed separately as "type").
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @result JSON array of annotation layer objects
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/annotations")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-annotations($corpusname, $textname) {
+  let $paths := ecutil:filepaths($corpusname, $textname)
+  let $text-collection := $paths?collections?text
+  let $ann-collection := $text-collection || "/annotations"
+
+  return
+    if (not(xmldb:collection-available($text-collection))) then
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+    else if (not(xmldb:collection-available($ann-collection))) then
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+    else
+      array {
+        for $resource in xmldb:get-child-resources($ann-collection)
+        let $doc := doc($ann-collection || "/" || $resource)
+        let $name := replace($resource, '\.xml$', '')
+        let $header := $doc//tei:teiHeader
+        let $type := string($doc//tei:listAnnotation/@type)
+        let $title := $header//tei:titleStmt/tei:title[1]/string()
+        let $licence := $header//tei:availability/tei:licence/@target/string()
+        let $source := $header//tei:sourceDesc/tei:bibl/tei:ref[@type="source"]/@target/string()
+        let $app := $header//tei:appInfo/tei:application
+        let $annotations := $doc//tei:annotation
+        order by $name
+        return map:merge((
+          map {
+            "name": $name,
+            "type": $type,
+            "size": count($annotations),
+            "categoryCounts": map:merge(
+              for $a in $annotations
+              let $cat := replace(string($a/@ana), '^#', '')
+              group by $cat
+              return map:entry($cat, count($a))
+            ),
+            "uri": $paths?uri || "/annotations/" || $name
+          },
+          if ($title) then map:entry("title", $title) else (),
+          if ($licence) then map:entry("licence", $licence) else (),
+          if ($source) then map:entry("source", $source) else (),
+          if ($app) then map:entry("application", map {
+            "ident": $app/@ident/string(),
+            "version": $app/@version/string()
+          }) else ()
+        ))
+      }
+};
+
+(:~
+ : Get a single annotation layer
+ :
+ : Returns JSON (default), TEI XML, or TSV depending on the format
+ : parameter. The layer is looked up by filename — the URL segment
+ : matches `{layername}.xml` in the text's annotations/ subcollection.
+ :
+ : Query params:
+ :   format   "json" (default) | "tei" | "tsv"
+ :   category filter annotations by @ana value (stripped of #).
+ :            Accepts single value, comma-separated, or repeated param.
+ :            Ignored when format=tei.
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @param $layername Layer name (filename without .xml)
+ : @param $format Output format
+ : @param $category Category filter(s)
+ :)
+declare
+  %rest:GET
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/annotations/{$layername}")
+  %rest:query-param("format", "{$format}", "json")
+  %rest:query-param("category", "{$category}")
+function api:text-annotation-layer(
+  $corpusname, $textname, $layername, $format, $category
+) {
+  let $paths := ecutil:filepaths($corpusname, $textname)
+  let $ann-file := $paths?collections?text || "/annotations/" || $layername || ".xml"
+  let $doc := if (doc-available($ann-file)) then doc($ann-file) else ()
+
+  return
+    if (not($doc)) then
+      <rest:response>
+        <http:response status="404"/>
+      </rest:response>
+    else if ($format = "tei") then (
+      <rest:response>
+        <http:response status="200">
+          <http:header name="Content-Type" value="application/xml"/>
+        </http:response>
+      </rest:response>,
+      $doc/tei:TEI
+    )
+    else
+      (: Tokenized base TEI for surface-form resolution :)
+      let $tokenized-file := $paths?collections?text || "/tokenized.xml"
+      let $tokenized := if (doc-available($tokenized-file)) then doc($tokenized-file) else ()
+      let $token-map := map:merge(
+        for $t in $tokenized//tei:text//(tei:w|tei:pc)[@xml:id]
+        return map:entry(string($t/@xml:id), string($t))
+      )
+
+      (: Category filter: single value, comma-separated, or repeated :)
+      let $categories :=
+        for $c in $category
+        return tokenize($c, ',')
+      let $annotations :=
+        if (count($categories) > 0) then
+          $doc//tei:annotation[replace(@ana, '^#', '') = $categories]
+        else
+          $doc//tei:annotation
+
+      return if ($format = "tsv") then
+        let $all-keys := distinct-values((
+          for $a in $annotations return (
+            for $attr in $a/(@ana, @corresp) return local-name($attr),
+            for $note in $a/tei:note[@type] return string($note/@type)
+          )
+        ))
+        let $header := string-join(("target_id", "target_text", $all-keys), "&#9;")
+        let $rows :=
+          for $a in $annotations
+          let $targets := tokenize(string($a/@target), '\s+')
+          let $ids := for $t in $targets return replace($t, '^#', '')
+          let $texts := for $id in $ids return ($token-map($id), '')[1]
+          let $body-map := map:merge((
+            for $attr in $a/(@ana, @corresp)
+            return map:entry(local-name($attr), string($attr)),
+            for $note in $a/tei:note[@type]
+            return map:entry(string($note/@type), normalize-space($note))
+          ))
+          return string-join((
+            string-join($ids, ' '),
+            string-join($texts, ' '),
+            for $k in $all-keys return ($body-map($k), '')[1]
+          ), "&#9;")
+        return (
+          <rest:response>
+            <http:response status="200">
+              <http:header name="Content-Type" value="text/tab-separated-values; charset=utf-8"/>
+            </http:response>
+          </rest:response>,
+          string-join(($header, $rows), "&#10;")
+        )
+      else
+        let $header := $doc//tei:teiHeader
+        let $name := $layername
+        let $type := string($doc//tei:listAnnotation/@type)
+        let $title := $header//tei:titleStmt/tei:title[1]/string()
+        let $licence := $header//tei:availability/tei:licence/@target/string()
+        let $source := $header//tei:sourceDesc/tei:bibl/tei:ref[@type="source"]/@target/string()
+        let $app := $header//tei:appInfo/tei:application
+        let $taxonomy := $header//tei:classDecl/tei:taxonomy
+
+        return (
+          <rest:response>
+            <http:response status="200">
+              <http:header name="Content-Type" value="application/json"/>
+            </http:response>
+          </rest:response>,
+          serialize(
+            map:merge((
+              map {
+                "name": $name,
+                "type": $type,
+                "size": count($annotations),
+                "categoryCounts": map:merge(
+                  for $a in $annotations
+                  let $cat := replace(string($a/@ana), '^#', '')
+                  group by $cat
+                  return map:entry($cat, count($a))
+                )
+              },
+              if ($title) then map:entry("title", $title) else (),
+              if ($licence) then map:entry("licence", $licence) else (),
+              if ($source) then map:entry("source", $source) else (),
+              if ($app) then map:entry("application", map {
+                "ident": $app/@ident/string(),
+                "version": $app/@version/string()
+              }) else (),
+              if ($taxonomy) then map:entry("taxonomy", map {
+                "id": $taxonomy/@xml:id/string(),
+                "categories": array {
+                  for $cat in $taxonomy/tei:category
+                  return map {
+                    "id": $cat/@xml:id/string(),
+                    "description": normalize-space($cat/tei:catDesc)
+                  }
+                }
+              }) else (),
+              map:entry("annotations", array {
+                for $a in $annotations
+                let $targets := tokenize(string($a/@target), '\s+')
+                let $ids := for $t in $targets return replace($t, '^#', '')
+                let $texts := for $id in $ids return ($token-map($id), '')[1]
+                return map {
+                  "target": if (count($ids) = 1) then
+                    map { "id": $ids[1], "text": $texts[1] }
+                  else
+                    map {
+                      "id": array { $ids },
+                      "text": string-join($texts, ' ')
+                    },
+                  "body": array {
+                    for $attr in $a/(@ana, @corresp)
+                    return map {
+                      "key": local-name($attr),
+                      "value": string($attr)
+                    },
+                    for $note in $a/tei:note[@type]
+                    return map {
+                      "key": string($note/@type),
+                      "value": normalize-space($note)
+                    }
+                  }
+                }
+              })
+            )),
+            map { "method": "json" }
+          )
+        )
+};
+
+(:~
+ : Add or replace an annotation layer for a text (admin endpoint)
+ :
+ : Stores the body as `{layerkey}.xml` in the text's annotations/
+ : subcollection. Creates the subcollection if missing. Accepts any
+ : TEI document without further validation.
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @param $layerkey Layer name (URL identifier, becomes filename)
+ : @param $data TEI document
+ : @param $auth Authorization header value
+ : @result JSON object with a confirmation message
+ :)
+declare
+  %rest:PUT("{$data}")
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/annotations/{$layerkey}")
+  %rest:header-param("Authorization", "{$auth}")
+  %rest:consumes("application/xml", "text/xml")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-annotation-layer-put(
+  $corpusname, $textname, $layerkey, $data, $auth
+) {
+  if (not($auth)) then
+    (
+      <rest:response><http:response status="401"/></rest:response>,
+      map { "message": "authorization required" }
+    )
+  else if (not(matches($layerkey, '^[a-z0-9]+(-[a-z0-9]+)*$'))) then
+    (
+      <rest:response><http:response status="400"/></rest:response>,
+      map {
+        "error": "invalid layer name",
+        "message": "Only lower case ASCII letters, digits and dashes are accepted."
+      }
+    )
+  else if (not($data/tei:TEI)) then
+    (
+      <rest:response><http:response status="400"/></rest:response>,
+      map { "error": "TEI document required" }
+    )
+  else
+    let $paths := ecutil:filepaths($corpusname, $textname)
+    let $text-collection := $paths?collections?text
+    return
+      if (not(xmldb:collection-available($text-collection))) then
+        (
+          <rest:response><http:response status="404"/></rest:response>,
+          map { "error": "no such text" }
+        )
+      else
+        let $ann-collection := xmldb:create-collection(
+          $text-collection, "annotations"
+        )
+        let $filename := $layerkey || ".xml"
+        let $existed := doc-available($ann-collection || "/" || $filename)
+        let $_ := xmldb:store($ann-collection, $filename, $data/tei:TEI)
+        return (
+          <rest:response>
+            <http:response status="{ if ($existed) then '200' else '201' }"/>
+          </rest:response>,
+          map {
+            "name": $layerkey,
+            "uri": $paths?uri || "/annotations/" || $layerkey,
+            "message": if ($existed) then "annotation layer replaced"
+                       else "annotation layer stored"
+          }
+        )
+};
+
+(:~
+ : Delete an annotation layer (admin endpoint)
+ :
+ : @param $corpusname Corpus name
+ : @param $textname Text name
+ : @param $layerkey Layer name
+ : @param $auth Authorization header value
+ : @result JSON object with a confirmation message
+ :)
+declare
+  %rest:DELETE
+  %rest:path("/ecocor/corpora/{$corpusname}/texts/{$textname}/annotations/{$layerkey}")
+  %rest:header-param("Authorization", "{$auth}")
+  %rest:produces("application/json")
+  %output:media-type("application/json")
+  %output:method("json")
+function api:text-annotation-layer-delete(
+  $corpusname, $textname, $layerkey, $auth
+) {
+  if (not($auth)) then
+    (
+      <rest:response><http:response status="401"/></rest:response>,
+      map { "message": "authorization required" }
+    )
+  else
+    let $paths := ecutil:filepaths($corpusname, $textname)
+    let $ann-collection := $paths?collections?text || "/annotations"
+    let $filename := $layerkey || ".xml"
+    let $file-uri := $ann-collection || "/" || $filename
+    return
+      if (not(doc-available($file-uri))) then
+        <rest:response><http:response status="404"/></rest:response>
+      else
+        let $_ := xmldb:remove($ann-collection, $filename)
+        return map { "message": "annotation layer deleted" }
+};
