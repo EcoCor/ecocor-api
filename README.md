@@ -50,7 +50,7 @@ REST interface, replacing any installed version of `ecocor-api`. The corpus data
 remains untouched. To deploy to the local instance from `docker compose`:
 
 ```sh
-EXIST_PASSWORD=secret ./deploy.sh build/ecocor-latest.xar http://localhost:8090/exist
+EXIST_PASSWORD=secret ./deploy.sh ecocor-latest.xar http://localhost:8090/exist
 ```
 
 For a remote server open an SSH tunnel to its eXist port first and pass the
@@ -58,7 +58,7 @@ tunnel URL:
 
 ```sh
 ssh -N -L 8888:localhost:8080 user@ecocor.org &
-EXIST_PASSWORD=secret ./deploy.sh build/ecocor-latest.xar http://localhost:8888/exist
+EXIST_PASSWORD=secret ./deploy.sh ecocor-latest.xar http://localhost:8888/exist
 ```
 
 The [Deploy](.github/workflows/deploy.yml) GitHub workflow does the same for the
