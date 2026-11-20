@@ -77,6 +77,10 @@ The server is configured in the `production`
 | `DEPLOY_KNOWN_HOSTS` | variable | the server's SSH host key(s) in `known_hosts` format |
 | `EXIST_PORT`         | variable | eXist port on the server (default `8080`)            |
 
+The deployment branch rules of the environment should only allow `main` and
+tags, and a tag ruleset should restrict who can create tags. Otherwise a manual
+run can deploy any branch.
+
 The workflow checks that `https://<DEPLOY_HOST>/api/info` reports the new
 version after installing the package.
 
