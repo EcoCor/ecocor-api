@@ -107,7 +107,7 @@ Key constants from `modules/config.xqm`:
 
 ## API Authentication
 
-Write endpoints (POST/PUT/DELETE) check that an `Authorization` header is present. The header value is compared directly against the stored admin secret — no JWT, no OAuth, no "Bearer" prefix parsing. Returns 401 if header is absent.
+Write endpoints (POST/PUT/DELETE) only check that an `Authorization` header is present and return 401 if it's missing. The credentials themselves are checked by eXist-db: the header must be HTTP Basic auth for an eXist-db user (e.g. `admin`). eXist rejects wrong credentials with 401 before the endpoint runs, and a non-Basic header (e.g. `Bearer …`) results in a 500.
 
 ## API Endpoints
 
