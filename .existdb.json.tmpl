@@ -1,7 +1,7 @@
 {
   "servers": {
     "localhost": {
-      "server": "http://localhost:@docker.port@/exist",
+      "server": "http://localhost:8090/exist",
       "user": "admin",
       "password": ""
     }
@@ -11,10 +11,8 @@
     "root": "/db/apps/ecocor",
     "active": true,
     "ignore": [
-      ".existdb.json",
+      ".existdb.json*",
       ".git/**",
-      "build.xml",
-      "build.properties",
       "build/**",
       "compose*.yml",
       "*.bak",

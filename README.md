@@ -28,18 +28,57 @@ curl http://localhost:8090/exist/restxq/ecocor/info
 
 ## Building the eXist extension
 
-For packaging the ecocor-api code into an eXist extension archive (XAR)
-[Apache Ant](https://ant.apache.org) is required. (On macOS it can be installed
-with homebrew: `brew install ant`.)
-
-Simply running
+To package the ecocor-api code into an eXist extension archive (XAR) that can
+be installed into an existing eXist DB instance run:
 
 ```sh
-ant
+./build.sh
 ```
 
-creates an  ecocor-x.x.x.xar archive in the `build` directory. This can be
-installed into an existing eXist DB instance.
+This creates an ecocor-x.x.x.xar archive in the `build` directory. It only
+requires `git`, `sed` and `zip`. The version is derived from `git describe` and
+can be overridden with the `VERSION` environment variable. `./build.sh clean`
+removes the build artifacts.
+
+Note that `build.sh` lists the files that go into the package explicitly. Any
+new top-level file the app needs must be added there.
+
+## Deployment
+
+The `deploy.sh` script installs a XAR package into a running eXist DB using its
+REST interface, replacing any installed version of `ecocor-api`. The corpus data
+remains untouched. To deploy to the local instance from `docker compose`:
+
+```sh
+EXIST_PASSWORD=secret ./deploy.sh ecocor-latest.xar http://localhost:8090/exist
+```
+
+For a remote server open an SSH tunnel to its eXist port first and pass the
+tunnel URL:
+
+```sh
+ssh -N -L 8888:localhost:8080 user@ecocor.org &
+EXIST_PASSWORD=secret ./deploy.sh ecocor-latest.xar http://localhost:8888/exist
+```
+
+The [Deploy](.github/workflows/deploy.yml) GitHub workflow does the same for the
+EcoCor production server when a release is published (not for pre-releases).
+It can also be run manually from the Actions tab, e.g. to redeploy.
+
+The server is configured in the `production`
+[GitHub environment](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments):
+
+| Name                 | Type     | Description                                          |
+| -------------------- | -------- | ---------------------------------------------------- |
+| `DEPLOY_KEY`         | secret   | SSH key of the user `github` on the server           |
+| `EXIST_PASSWORD`     | secret   | eXist DB password                                    |
+| `EXIST_USER`         | secret   | eXist DB user (optional, default `admin`)            |
+| `DEPLOY_HOST`        | variable | server host name, e.g. `ecocor.org`                  |
+| `DEPLOY_KNOWN_HOSTS` | variable | the server's SSH host key(s) in `known_hosts` format |
+| `EXIST_PORT`         | variable | eXist port on the server (default `8080`)            |
+
+The workflow checks that `https://<DEPLOY_HOST>/api/info` reports the new
+version after installing the package.
 
 ## Visual Studio Code integration
 
@@ -49,11 +88,9 @@ a running database instance. We provide a configuration template that integrates
 VS Code with the eXist instance from `docker compose`. Run
 
 ```sh
-ant existdb.json
-# or
 cp .existdb.json.tmpl .existdb.json
-# and edit the docker.port placeholder
 ```
 
-to create a configuration file. For usage details see the
+to create a configuration file and adjust the password if needed. For usage
+details see the
 [extension's documentation](https://marketplace.visualstudio.com/items?itemName=eXist-db.existdb-vscode).
