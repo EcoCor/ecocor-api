@@ -35,7 +35,6 @@ declare variable $config:corpora-root := $config:ecocor-root || "/corpora";
 declare variable $config:webhook-root := $config:ecocor-root || "/webhook";
 
 declare variable $config:file := $config:ecocor-root || "/config.xml";
-declare variable $config:secrets-file := $config:ecocor-root || "/secrets.xml";
 
 (:
   The base URL under which the REST API is hosted.
@@ -45,9 +44,6 @@ declare variable $config:secrets-file := $config:ecocor-root || "/secrets.xml";
 :)
 declare variable $config:api-base :=
   doc($config:file)//api-base/normalize-space();
-
-declare variable $config:webhook-secret :=
-  doc($config:secrets-file)//gh-webhook/normalize-space();
 
 (: the directory path in corpus repos where the TEI files reside :)
 declare variable $config:corpus-repo-prefix := 'tei';

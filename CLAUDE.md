@@ -58,7 +58,6 @@ HTTP → RESTXQ (api.xqm) → tei.xqm / entities.xqm / metrics.xqm → eXist-db 
 /db/apps/ecocor/           ← deployed application code
 /db/ecocor/
   config.xml               ← runtime config (API base URL, extractor server)
-  secrets.xml              ← webhook secret (rw-------)
   corpora/{name}/
     corpus.xml             ← corpus metadata
     {textname}/
@@ -86,13 +85,12 @@ HTTP → RESTXQ (api.xqm) → tei.xqm / entities.xqm / metrics.xqm → eXist-db 
 
 ## Configuration
 
-Runtime config is created during `post-install.xq` from environment variables:
+`post-install.xq` writes the runtime config `/db/ecocor/config.xml` on every package install. It is created with the defaults below on the first install; after that, each variable that is set (and not empty) replaces the stored value, and unset variables keep it. To change a value on a server, set the variable in eXist-db's environment and redeploy. The API code itself can't read the environment: `environment-variable()` returns nothing for non-DBA users such as RESTXQ requests.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `ECOCOR_API_BASE` | `https://ecocor.org/api` | Public API base URL |
 | `EXTRACTOR_SERVER` | `http://localhost:8040` | NLP entity extractor URL |
-| `GITHUB_WEBHOOK_SECRET` | — | Webhook HMAC secret |
 | `EXIST_PASSWORD` | random | eXist-db admin password |
 | `EXIST_PASSWORD_FILE` | — | Docker secret file path |
 | `EXIST_ENV` | `development` | Set to `production` to require a non-empty password |
