@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Install a ecocor-api XAR package into a running eXist-db using its REST
+# Install an ecocor-api XAR package into a running eXist-db using its REST
 # interface.
 #
 # Usage:
