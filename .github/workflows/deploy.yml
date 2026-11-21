@@ -25,14 +25,6 @@ jobs:
       xar: ${{ steps.build.outputs.xar }}
       version: ${{ steps.build.outputs.version }}
     steps:
-      - name: Check ref
-        if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
-        env:
-          REF: ${{ github.ref }}
-        run: |
-          echo "::error::Only main or a tag can be deployed, not $REF"
-          exit 1
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
