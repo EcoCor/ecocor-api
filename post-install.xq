@@ -14,73 +14,64 @@ declare function local:store ($file-path, $content) {
   return xmldb:store($col, $name, $content)
 };
 
-(: We create an initial config file the values of which can be passed by the
- : following environment variables:
+(: Set the child element $name of $parent to the value of the environment
+ : variable $var. A missing element is added. If the variable is not set (or
+ : empty) the stored value is kept.
+ :)
+declare function local:set-from-env (
+  $parent as element(),
+  $name as xs:string,
+  $var as xs:string
+) as empty-sequence() {
+  let $value := environment-variable($var)
+  let $element := $parent/*[local-name() = $name]
+  return
+    if (not($value)) then ()
+    else if ($element) then (
+      util:log-system-out("Setting " || $name || " from " || $var),
+      update value $element with $value
+    ) else (
+      util:log-system-out("Adding " || $name || " from " || $var),
+      update insert element { $name } { $value } into $parent
+    )
+};
+
+(: The config file is created with default values on the first install. On
+ : every install the values are then updated from the following environment
+ : variables, as far as they are set:
  :
  : - ECOCOR_API_BASE: base URI the EcoCor API will be available under
+ :   (default: https://ecocor.org/api)
  : - EXTRACTOR_SERVER: EcoCor extractor service URI
+ :   (default: http://localhost:8040)
  :)
-declare function local:create-config-file ()
-as item()? {
-  if(doc($config:file)/config) then
-    ()
-  else
+declare function local:update-config-file ()
+as item()* {
+  if (doc($config:file)/config) then ()
+  else (
     util:log-system-out("Creating " || $config:file),
     local:store(
       $config:file,
       <config>
-        <api-base>
-        {
-          if (environment-variable("ECOCOR_API_BASE")) then
-            environment-variable("ECOCOR_API_BASE")
-          else "https://ecocor.org/api"
-        }
-        </api-base>
+        <api-base>https://ecocor.org/api</api-base>
         <services>
-          <extractor>
-          {
-            if (environment-variable("EXTRACTOR_SERVER")) then
-              environment-variable("EXTRACTOR_SERVER")
-            else "http://localhost:8040"
-          }
-          </extractor>
+          <extractor>http://localhost:8040</extractor>
         </services>
       </config>
     )
-};
-
-(: We create an initial config file the values of which can be passed by the
- : following environment variables:
- :
- : - GITHUB_WEBHOOK_SECRET: secret for the GitHub webhook
- :)
-declare function local:create-secrets-file ()
-as item()? {
-  if(doc($config:secrets-file)/secrets) then
-    ()
-  else (
-    util:log-system-out("Creating " || $config:secrets-file),
-    local:store(
-      $config:secrets-file,
-      <secrets>
-        <gh-webhook>{environment-variable("GITHUB_WEBHOOK_SECRET")}</gh-webhook>
-      </secrets>
-    ),
-    sm:chmod(xs:anyURI($config:secrets-file), 'rw-------')
+  ),
+  if (doc($config:file)/config/services) then ()
+  else update insert <services/> into doc($config:file)/config,
+  local:set-from-env(doc($config:file)/config, "api-base", "ECOCOR_API_BASE"),
+  local:set-from-env(
+    doc($config:file)/config/services, "extractor", "EXTRACTOR_SERVER"
   )
 };
-
-(: elevate privileges for github webhook :)
-(: let $webhook := xs:anyURI($target || '/modules/webhook.xqm') :)
 
 (: register the RESTXQ module :)
 let $restxq-module := xs:anyURI('modules/api.xpm')
 
 return (
-  local:create-config-file(),
-  local:create-secrets-file(),
-  (: sm:chown($webhook, "admin"),
-  sm:chgrp($webhook, "dba"),
-  sm:chmod($webhook, 'rwsr-xr-x'), :)
+  local:update-config-file(),
   exrest:register-module($restxq-module)
 )
