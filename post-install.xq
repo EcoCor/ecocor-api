@@ -68,16 +68,10 @@ as item()* {
   )
 };
 
-(: elevate privileges for github webhook :)
-(: let $webhook := xs:anyURI($target || '/modules/webhook.xqm') :)
-
 (: register the RESTXQ module :)
 let $restxq-module := xs:anyURI('modules/api.xpm')
 
 return (
   local:update-config-file(),
-  (: sm:chown($webhook, "admin"),
-  sm:chgrp($webhook, "dba"),
-  sm:chmod($webhook, 'rwsr-xr-x'), :)
   exrest:register-module($restxq-module)
 )

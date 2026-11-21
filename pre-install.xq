@@ -35,7 +35,6 @@ xdb:store-files-from-pattern(
   concat("/db/system/config", $target), $dir, "collection.xconf"
 ),
 xdb:create-collection("/", $config:corpora-root),
-xdb:create-collection("/", $config:webhook-root),
 local:mkcol("/db/system/config", $config:corpora-root),
 xdb:store-files-from-pattern(
   concat("/db/system/config", $config:corpora-root), $dir, "data.xconf"

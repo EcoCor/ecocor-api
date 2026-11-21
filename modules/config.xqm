@@ -32,7 +32,6 @@ declare variable $config:app-root :=
 
 declare variable $config:ecocor-root := "/db/ecocor";
 declare variable $config:corpora-root := $config:ecocor-root || "/corpora";
-declare variable $config:webhook-root := $config:ecocor-root || "/webhook";
 
 declare variable $config:file := $config:ecocor-root || "/config.xml";
 
