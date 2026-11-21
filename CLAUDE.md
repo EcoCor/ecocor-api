@@ -85,7 +85,7 @@ HTTP → RESTXQ (api.xqm) → tei.xqm / entities.xqm / metrics.xqm → eXist-db 
 
 ## Configuration
 
-`post-install.xq` writes the runtime config `/db/ecocor/config.xml` on every package install. It is created with the defaults below on the first install; after that, each variable that is set (and not empty) replaces the stored value, and unset variables keep it. To change a value on a server, set the variable in eXist-db's environment and redeploy. The API code itself can't read the environment: `environment-variable()` returns nothing for non-DBA users such as RESTXQ requests.
+`post-install.xq` writes the runtime config `/db/ecocor/config.xml` on every package install. It is created with the defaults below on the first install; after that, each variable that is set (and not empty) replaces the stored value, and unset variables keep it. To change a value on a server, set the variable in eXist-db's environment and redeploy. The API code itself can't read the environment: `environment-variable()` returns nothing for non-DBA users such as RESTXQ requests. The Docker image sets no defaults for these variables; `compose.yml` passes them as runtime environment.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|

@@ -5,11 +5,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - EXTRACTOR_SERVER=http://extractor
     environment:
       - EXIST_PASSWORD=
       - ECOCOR_API_BASE=http://localhost:8090/exist/restxq/ecocor
+      - EXTRACTOR_SERVER=http://extractor
     ports:
       - "8090:8080"
   extractor:

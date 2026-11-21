@@ -21,8 +21,6 @@ ARG VERSION
 ARG MAX_MEMORY
 ARG EXIST_URL
 ARG SAXON_JAR
-ARG ECOCOR_API_BASE
-ARG EXTRACTOR_SERVER
 
 ENV VERSION=${VERSION:-6.4.0}
 ENV EXIST_URL=${EXIST_URL:-https://github.com/eXist-db/exist/releases/download/eXist-${VERSION}/exist-installer-${VERSION}.jar}
@@ -33,8 +31,6 @@ ENV EXIST_CONTEXT_PATH=${EXIST_CONTEXT_PATH:-/exist}
 ENV EXIST_DATA_DIR=${EXIST_DATA_DIR:-/opt/exist/data}
 ENV SAXON_JAR=${SAXON_JAR:-/opt/exist/lib/Saxon-HE-9.9.1-8.jar}
 ENV LOG4J_FORMAT_MSG_NO_LOOKUPS=true
-ENV ECOCOR_API_BASE=${ECOCOR_API_BASE:-http://localhost:8080/exist/restxq}
-ENV EXTRACTOR_SERVER=${EXTRACTOR_SERVER:-http://localhost:8040}
 
 RUN useradd ecocor
 

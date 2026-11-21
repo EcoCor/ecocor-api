@@ -26,6 +26,14 @@ To check that the EcoCor API is up run
 curl http://localhost:8090/exist/restxq/ecocor/info
 ```
 
+The configuration of the API (`/db/ecocor/config.xml`) is taken from the
+environment variables `ECOCOR_API_BASE` (default: `https://ecocor.org/api`) and
+`EXTRACTOR_SERVER` (default: `http://localhost:8040`) of the container, see
+[compose.yml](compose.yml). The image itself sets no defaults for them. The
+config is updated whenever the package is installed: a variable that is set
+replaces the stored value, an unset one keeps it. In the Docker image the
+package is only installed on the first start, i.e. with an empty data volume.
+
 ## Building the eXist extension
 
 To package the ecocor-api code into an eXist extension archive (XAR) that can
